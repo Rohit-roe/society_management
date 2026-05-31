@@ -183,7 +183,10 @@ const getGlobalSummary = async (req, res) => {
     const pollCount = await Poll.countDocuments();
     const eventCount = await EventProposal.countDocuments();
     const pollsList = await Poll.find();
-    const totalPollVotes = pollsList.reduce((acc, curr) => acc + (curr.votes?.length || 0), 0);
+    const totalPollVotes = pollsList.reduce(
+      (acc, curr) => acc + (curr.votesYes?.length || 0) + (curr.votesNo?.length || 0),
+      0
+    );
 
     // High defaulter societies
     const highDefaulters = await Maintenance.aggregate([

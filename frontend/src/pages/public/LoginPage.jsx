@@ -35,8 +35,8 @@ const LoginPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 flex flex-col justify-center py-12 sm:px-6 lg:px-8 font-sans">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
+    <div className="min-h-screen bg-slate-100 flex flex-col justify-center items-center py-12 px-4 sm:px-6 lg:px-8 font-sans">
+      <div className="w-full max-w-md text-center">
         <Link to="/" className="text-3xl font-extrabold text-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded-lg px-2 py-1">
           🏢 SocietyApp
         </Link>
@@ -45,7 +45,7 @@ const LoginPage = () => {
         </h2>
       </div>
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
+      <div className="mt-8 w-full max-w-md">
         <div className="bg-white py-8 px-4 shadow-md sm:rounded-xl sm:px-10 border border-slate-200">
           <form className="space-y-6" onSubmit={handleSubmit}>
             <div>

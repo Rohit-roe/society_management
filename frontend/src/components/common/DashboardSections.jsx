@@ -4,11 +4,11 @@ import { Info } from 'lucide-react';
 const joinClasses = (...classes) => classes.filter(Boolean).join(' ');
 const renderIcon = (icon, className = 'dashboard-icon') => {
   if (!icon) return null;
-  if (typeof icon === 'function') {
-    const Icon = icon;
-    return <Icon className={className} aria-hidden="true" />;
+  if (typeof icon === 'string' || typeof icon === 'number') {
+    return icon;
   }
-  return icon;
+  const IconComponent = icon;
+  return <IconComponent className={className} aria-hidden="true" />;
 };
 
 export const DashboardPage = ({ children, className = '' }) => (

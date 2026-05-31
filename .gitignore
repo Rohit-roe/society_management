@@ -5,3 +5,5 @@ dist/
 guide-part1.txt
 guide-part2.txt
 extract-docx.ps1
+
+agents.md

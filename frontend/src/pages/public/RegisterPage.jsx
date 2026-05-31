@@ -142,8 +142,8 @@ const RegisterPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8 font-sans">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
+    <div className="min-h-screen bg-slate-100 flex flex-col justify-center items-center py-12 px-4 sm:px-6 lg:px-8 font-sans">
+      <div className="w-full max-w-md text-center">
         <Link to="/" className="text-3xl font-extrabold text-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded px-2 py-1">
           🏢 SocietyApp
         </Link>
@@ -152,7 +152,7 @@ const RegisterPage = () => {
         </h2>
       </div>
 
-      <div className="mt-8 sm:mx-auto sm:w-full" style={{ maxWidth: activeTab === 'create' ? '640px' : '480px' }}>
+      <div className="mt-8 w-full" style={{ maxWidth: activeTab === 'create' ? '640px' : '480px' }}>
         <div className="bg-white py-8 px-6 shadow-md sm:rounded-xl border border-slate-200">
           
           {/* Dual Tabs */}
