@@ -1,0 +1,7 @@
+node_modules/
+.env
+dist/
+.DS_Store
+guide-part1.txt
+guide-part2.txt
+extract-docx.ps1
