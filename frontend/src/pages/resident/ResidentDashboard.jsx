@@ -1,8 +1,30 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { BookOpen, CalendarPlus, FolderLock, Home, ListChecks, MessageSquare, Plus, Ticket, Vote, Wallet, Wrench } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import toast from 'react-hot-toast';
 import API from '../../api/axios';
+import {
+  DashboardActionGrid,
+  DashboardActionLink,
+  DashboardCard,
+  DashboardEmptyState,
+  DashboardHeader,
+  DashboardKpiCard,
+  DashboardKpiGrid,
+  DashboardPage,
+  DashboardSection,
+  DashboardStatusBadge,
+} from '../../components/common/DashboardSections';
+
+const formatCurrency = (value = 0) => `Rs. ${Number(value || 0).toLocaleString()}`;
+
+const statusTone = (status) => {
+  if (status === 'paid' || status === 'resolved') return 'success';
+  if (status === 'overdue' || status === 'urgent') return 'danger';
+  if (status === 'pending' || status === 'open' || status === 'in_progress') return 'warning';
+  return 'neutral';
+};
 
 const ResidentDashboard = () => {
   const { user } = useAuth();
@@ -13,7 +35,6 @@ const ResidentDashboard = () => {
   const [polls, setPolls] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Family management state
   const [family, setFamily] = useState([]);
   const [showFamilyModal, setShowFamilyModal] = useState(false);
   const [newFamilyForm, setNewFamilyForm] = useState({
@@ -86,288 +107,230 @@ const ResidentDashboard = () => {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[300px]">
-        <span className="text-slate-600 text-sm font-semibold flex items-center gap-2">
-          <svg className="animate-spin h-5 w-5 text-indigo-600" fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-          </svg>
-          Loading your dashboard...
-        </span>
-      </div>
-    );
+    return <p className="page-container">Loading your dashboard...</p>;
   }
 
+  const openTickets = tickets.filter((t) => t.status !== 'resolved');
+  const needsPayment = myRecord && myRecord.status !== 'paid';
+
   return (
-    <div className="space-y-8 font-sans">
-      {/* Welcome Banner */}
-      <div className="bg-gradient-to-r from-indigo-600 to-indigo-800 rounded-2xl p-6 md:p-8 text-white flex flex-col md:flex-row md:items-center md:justify-between shadow-lg gap-6">
-        <div>
-          <h2 className="text-2xl md:text-3xl font-extrabold tracking-tight">Welcome Home, {user?.name}!</h2>
-          <p className="text-white/80 font-medium mt-1">
-            Flat {user?.flatNumber || 'N/A'} | Society Resident Portal
-          </p>
-        </div>
-        {wallet && (
-          <div className="bg-white/10 backdrop-blur-md rounded-xl p-4 md:text-right border border-white/15">
-            <span className="text-[10px] uppercase font-bold tracking-widest text-indigo-200">SOCIETY WALLET</span>
-            <h3 className="text-2xl md:text-3xl font-black mt-0.5">₹{wallet.balance.toLocaleString()}</h3>
-          </div>
-        )}
-      </div>
-
-      {/* 3-Column Core Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Maintenance */}
-        <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
-          <div>
-            <div className="border-b border-slate-100 pb-3 mb-4">
-              <h3 className="text-md font-bold text-slate-800">Maintenance Dues</h3>
+    <DashboardPage>
+      <DashboardHeader
+        title={`Welcome Home, ${user?.name || 'Resident'}`}
+        subtitle={`Flat ${user?.flatNumber || 'N/A'} | Society Resident Portal`}
+        summary={
+          wallet && (
+            <div className="dashboard-header-summary">
+              <span>Society Wallet</span>
+              <strong>{formatCurrency(wallet.balance)}</strong>
             </div>
-            {myRecord ? (
-              <div className="space-y-3">
-                <p className="text-sm font-semibold text-slate-600">
-                  Billing Cycle: <span className="text-slate-900 font-bold">{myRecord.month}/{myRecord.year}</span>
-                </p>
-                <p className="text-2xl font-black text-slate-900">₹{myRecord.amount}</p>
-                <span
-                  className={`inline-flex px-3 py-1 rounded-full text-xs font-bold ${
-                    myRecord.status === 'paid'
-                      ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                      : 'bg-rose-100 text-rose-800 border border-rose-200'
-                  }`}
-                >
-                  {myRecord.status.toUpperCase()}
-                </span>
+          )
+        }
+      />
+
+      <DashboardKpiGrid>
+        <DashboardKpiCard
+          icon={Wallet}
+          label="Wallet Balance"
+          value={wallet ? formatCurrency(wallet.balance) : 'Unavailable'}
+          helper="Resident society wallet"
+        />
+        <DashboardKpiCard
+          icon={Wrench}
+          label="Maintenance"
+          value={myRecord ? formatCurrency(myRecord.amount) : 'No Record'}
+          helper={myRecord ? `${myRecord.month}/${myRecord.year} - ${myRecord.status}` : 'No maintenance logged'}
+          tone={statusTone(myRecord?.status)}
+        />
+        <DashboardKpiCard
+          icon={Vote}
+          label="Active Polls"
+          value={polls.length}
+          helper="Community decisions awaiting votes"
+          tone={polls.length ? 'warning' : 'default'}
+        />
+        <DashboardKpiCard
+          icon={Ticket}
+          label="Support Tickets"
+          value={openTickets.length}
+          helper="Open or in-progress requests"
+          tone={openTickets.length ? 'warning' : 'default'}
+        />
+      </DashboardKpiGrid>
+
+      <DashboardSection
+        title="Urgent Work"
+        description="Items that may need your action today."
+        icon={ListChecks}
+        priority="urgent"
+      >
+        <div className="dashboard-card-grid">
+          {needsPayment && (
+            <DashboardCard emphasis="urgent">
+              <h4>Maintenance payment due</h4>
+              <p>
+                Billing cycle {myRecord.month}/{myRecord.year} has an outstanding amount of{' '}
+                <strong>{formatCurrency(myRecord.amount)}</strong>.
+              </p>
+              <div className="dashboard-inline-actions">
+                <DashboardStatusBadge tone={statusTone(myRecord.status)} icon={Wrench}>{myRecord.status}</DashboardStatusBadge>
+                <Link to="/maintenance/my" className="dashboard-link">View Statement -&gt;</Link>
               </div>
-            ) : (
-              <p className="text-sm text-slate-500 italic">No maintenance records logged.</p>
-            )}
-          </div>
-          <Link
-            to="/maintenance/my"
-            className="text-sm font-bold text-indigo-600 hover:text-indigo-700 mt-6 inline-flex items-center gap-1 focus:ring-2 focus:ring-indigo-500 focus:outline-none rounded w-fit"
-          >
-            View Statement & Pay &rarr;
-          </Link>
-        </div>
+            </DashboardCard>
+          )}
 
-        {/* Notices */}
-        <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
-          <div>
-            <div className="border-b border-slate-100 pb-3 mb-4">
-              <h3 className="text-md font-bold text-slate-800">Recent Notices</h3>
-            </div>
-            {notices.length === 0 ? (
-              <p className="text-sm text-slate-500 italic">No announcements posted yet.</p>
-            ) : (
-              <ul className="space-y-3 list-none">
-                {notices.map((n) => (
-                  <li key={n._id} className="border-b border-slate-50 pb-2 last:border-0 last:pb-0">
-                    <strong className="text-sm text-slate-950 font-bold hover:text-indigo-600 transition-colors block">
-                      {n.title}
-                    </strong>
-                    <span className="text-[10px] font-bold text-slate-400 block mt-0.5">
-                      📅 {new Date(n.createdAt).toLocaleDateString()}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-          <Link
-            to="/notices"
-            className="text-sm font-bold text-indigo-600 hover:text-indigo-700 mt-6 inline-flex items-center gap-1 focus:ring-2 focus:ring-indigo-500 focus:outline-none rounded w-fit"
-          >
-            Open Notice Board &rarr;
-          </Link>
-        </div>
+          {polls.slice(0, 2).map((poll) => (
+            <DashboardCard key={poll._id} emphasis="urgent">
+              <h4>{poll.title}</h4>
+              <p>Deadline: {new Date(poll.deadline).toLocaleDateString()}</p>
+              <div className="dashboard-inline-actions">
+                <DashboardStatusBadge tone="warning" icon={Vote}>Vote Needed</DashboardStatusBadge>
+                <Link to="/voting" className="dashboard-link">Cast Vote -&gt;</Link>
+              </div>
+            </DashboardCard>
+          ))}
 
-        {/* Complaints */}
-        <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
-          <div>
-            <div className="border-b border-slate-100 pb-3 mb-4">
-              <h3 className="text-md font-bold text-slate-800">Support Complaints</h3>
-            </div>
-            {tickets.length === 0 ? (
-              <p className="text-sm text-slate-500 italic">No active support complaints.</p>
-            ) : (
-              <ul className="space-y-3 list-none">
-                {tickets.map((t) => (
-                  <li key={t._id} className="flex justify-between items-center gap-4">
-                    <span className="text-sm font-semibold text-slate-800 truncate max-w-[150px]">
-                      {t.title || t.subject}
-                    </span>
-                    <span
-                      className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full ${
-                        t.status === 'resolved'
-                          ? 'bg-emerald-100 text-emerald-800'
-                          : 'bg-amber-100 text-amber-800'
-                      }`}
-                    >
-                      {t.status}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-          <Link
-            to="/support/my"
-            className="text-sm font-bold text-indigo-600 hover:text-indigo-700 mt-6 inline-flex items-center gap-1 focus:ring-2 focus:ring-indigo-500 focus:outline-none rounded w-fit"
-          >
-            File or Track Tickets &rarr;
-          </Link>
-        </div>
-      </div>
+          {openTickets.slice(0, 2).map((ticket) => (
+            <DashboardCard key={ticket._id} emphasis="urgent">
+              <h4>{ticket.title || ticket.subject}</h4>
+              <p>Track the latest response from society administration.</p>
+              <div className="dashboard-inline-actions">
+                <DashboardStatusBadge tone={statusTone(ticket.status)} icon={Ticket}>{ticket.status}</DashboardStatusBadge>
+                <Link to="/support/my" className="dashboard-link">Track Ticket -&gt;</Link>
+              </div>
+            </DashboardCard>
+          ))}
 
-      {/* 2-Column Grid: Polls & Operations */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Community Votes */}
-        <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
-          <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">🗳️ Community Votes</h3>
-          {polls.length === 0 ? (
-            <p className="text-sm text-slate-500 italic">No active decision polls require your vote.</p>
-          ) : (
-            <div className="space-y-3">
-              {polls.map((p) => (
-                <div key={p._id} className="bg-slate-50 border border-slate-200 p-4 rounded-lg flex items-center justify-between gap-4">
-                  <div>
-                    <strong className="text-sm font-bold text-slate-900 block">{p.title}</strong>
-                    <span className="text-xs text-slate-500 mt-0.5 block">
-                      Deadline: {new Date(p.deadline).toLocaleDateString()}
-                    </span>
-                  </div>
-                  <Link
-                    to="/voting"
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 py-2 rounded-lg transition-colors focus:ring-2 focus:ring-indigo-500 focus:outline-none shadow-sm"
-                  >
-                    Cast Vote
-                  </Link>
-                </div>
-              ))}
-            </div>
+          {!needsPayment && polls.length === 0 && openTickets.length === 0 && (
+            <DashboardEmptyState
+              title="No urgent resident actions"
+              message="Maintenance, voting, and support queues are clear."
+            />
           )}
         </div>
+      </DashboardSection>
 
-        {/* Quick Operations */}
-        <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm flex flex-col justify-between">
-          <h3 className="text-lg font-bold text-slate-900 mb-4">Quick Operations</h3>
-          <div className="grid grid-cols-2 gap-4">
-            <Link
-              to="/visitors"
-              className="bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-800 font-bold p-4 rounded-lg text-center text-sm shadow-sm transition-all focus:ring-2 focus:ring-indigo-500 focus:outline-none hover:-translate-y-0.5 active:translate-y-0"
-            >
-              Log Visitor
-            </Link>
-            <Link
-              to="/visitors/pre-approve"
-              className="bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-800 font-bold p-4 rounded-lg text-center text-sm shadow-sm transition-all focus:ring-2 focus:ring-indigo-500 focus:outline-none hover:-translate-y-0.5 active:translate-y-0"
-            >
-              Pre-Approve Guest
-            </Link>
-            <Link
-              to="/bookings"
-              className="bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-800 font-bold p-4 rounded-lg text-center text-sm shadow-sm transition-all focus:ring-2 focus:ring-indigo-500 focus:outline-none hover:-translate-y-0.5 active:translate-y-0"
-            >
-              Book Facility
-            </Link>
-            <Link
-              to="/vault"
-              className="bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-800 font-bold p-4 rounded-lg text-center text-sm shadow-sm transition-all focus:ring-2 focus:ring-indigo-500 focus:outline-none hover:-translate-y-0.5 active:translate-y-0"
-            >
-              Bylaws Vault
-            </Link>
-          </div>
+      <DashboardSection
+        title="Recent Activity"
+        description="Latest society updates and resident support movement."
+        icon={MessageSquare}
+      >
+        <div className="dashboard-two-column">
+          <DashboardCard>
+            <h4>Recent Notices</h4>
+            {notices.length === 0 ? (
+              <DashboardEmptyState title="No notices posted" message="New announcements will appear here." />
+            ) : (
+              <ul className="dashboard-list">
+                {notices.map((notice) => (
+                  <li key={notice._id} className="dashboard-list-item">
+                    <div>
+                      <strong>{notice.title}</strong>
+                      <span>{new Date(notice.createdAt).toLocaleDateString()}</span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </DashboardCard>
+
+          <DashboardCard>
+            <h4>Support Complaints</h4>
+            {tickets.length === 0 ? (
+              <DashboardEmptyState title="No active complaints" message="Filed tickets and responses will appear here." />
+            ) : (
+              <ul className="dashboard-list">
+                {tickets.map((ticket) => (
+                  <li key={ticket._id} className="dashboard-list-item">
+                    <div>
+                      <strong>{ticket.title || ticket.subject}</strong>
+                      <span>Support request</span>
+                    </div>
+                    <DashboardStatusBadge tone={statusTone(ticket.status)} icon={Ticket}>{ticket.status}</DashboardStatusBadge>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </DashboardCard>
         </div>
-      </div>
+      </DashboardSection>
 
-      {/* Family Roster */}
-      <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-4 mb-6 gap-4">
-          <div>
-            <h3 className="text-lg font-bold text-slate-900">👨‍👩‍👧‍👦 Family Members & Emergency Contacts</h3>
-            <p className="text-xs text-slate-500 mt-1">Configure emergency links and household registry.</p>
-          </div>
-          <button
-            type="button"
-            className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm px-4 py-2 rounded-lg transition-colors focus:ring-2 focus:ring-indigo-500 focus:outline-none shadow-sm active:scale-95 self-start sm:self-auto"
-            onClick={() => setShowFamilyModal(true)}
-          >
-            ➕ Add Family Member
+      <DashboardSection
+        title="Quick Actions"
+        description="Common resident tasks."
+        icon={Plus}
+        priority="tertiary"
+      >
+        <DashboardActionGrid>
+          <DashboardActionLink to="/visitors" icon={BookOpen} title="Log Visitor" description="Review gate entries" />
+          <DashboardActionLink to="/visitors/pre-approve" icon={Plus} title="Pre-Approve Guest" description="Notify gate staff" />
+          <DashboardActionLink to="/bookings" icon={CalendarPlus} title="Book Facility" description="Reserve shared spaces" />
+          <DashboardActionLink to="/vault" icon={FolderLock} title="Bylaws Vault" description="Open resident documents" />
+        </DashboardActionGrid>
+      </DashboardSection>
+
+      <DashboardSection
+        title="Secondary Content"
+        description="Household registry and emergency contacts."
+        icon={Home}
+        actions={
+          <button type="button" className="btn btn-primary" onClick={() => setShowFamilyModal(true)}>
+            + Add Family Member
           </button>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {family.length > 0 ? (
-            family.map((m) => (
-              <div
-                key={m._id}
-                className={`bg-slate-50 border rounded-xl p-5 shadow-sm hover:shadow relative flex flex-col justify-between transition-all ${
-                  m.isEmergencyContact ? 'border-rose-300 border-l-4 border-l-rose-500' : 'border-slate-200'
-                }`}
-              >
-                <div>
-                  <h4 className="font-extrabold text-slate-950 text-md capitalize">{m.name}</h4>
-                  <p className="text-xs text-slate-500 font-semibold capitalize mt-1">Relation: {m.relation}</p>
-                  <p className="text-xs text-slate-500 mt-1">Phone: {m.phone || 'N/A'}</p>
-                  {m.isEmergencyContact && (
-                    <span className="inline-flex mt-3 text-[10px] font-extrabold bg-rose-100 text-rose-800 border border-rose-200 px-2 py-0.5 rounded">
-                      🚨 EMERGENCY LINK
-                    </span>
+        }
+      >
+        {family.length > 0 ? (
+          <div className="dashboard-card-grid">
+            {family.map((member) => (
+              <DashboardCard key={member._id}>
+                <h4>{member.name}</h4>
+                <p>Relation: {member.relation}</p>
+                <p>Phone: {member.phone || 'N/A'}</p>
+                <div className="dashboard-inline-actions">
+                  {member.isEmergencyContact && (
+                    <DashboardStatusBadge tone="danger" icon={Home}>Emergency Contact</DashboardStatusBadge>
                   )}
-                </div>
-                <div className="flex justify-end mt-4">
-                  <button
-                    type="button"
-                    className="bg-rose-50 hover:bg-rose-100 text-rose-700 hover:text-rose-800 text-xs font-bold px-3 py-1.5 rounded-lg border border-rose-200 transition-colors focus:ring-2 focus:ring-rose-500 focus:outline-none"
-                    onClick={() => handleDeleteFamily(m._id)}
-                  >
+                  <button type="button" className="btn btn-danger" onClick={() => handleDeleteFamily(member._id)}>
                     Remove
                   </button>
                 </div>
-              </div>
-            ))
-          ) : (
-            <p className="text-slate-500 italic text-sm col-span-full">No family members registered. Add entries to verify gated approvals.</p>
-          )}
-        </div>
-      </div>
+              </DashboardCard>
+            ))}
+          </div>
+        ) : (
+          <DashboardEmptyState
+            title="No family members registered"
+            message="Add household contacts to support emergency and gated approvals."
+          />
+        )}
+      </DashboardSection>
 
-      {/* Add Family Modal */}
       {showFamilyModal && (
         <div className="modal-overlay">
           <div className="modal-content">
             <div className="modal-header">
               <h3 className="modal-title">Add Family Member</h3>
-              <button
-                type="button"
-                className="modal-close"
-                onClick={() => setShowFamilyModal(false)}
-              >
-                ✕
+              <button type="button" className="modal-close" onClick={() => setShowFamilyModal(false)}>
+                x
               </button>
             </div>
-            <form onSubmit={handleAddFamily} className="space-y-4">
+            <form onSubmit={handleAddFamily}>
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1">Full Name</label>
+                <label>Full Name</label>
                 <input
                   type="text"
                   placeholder="e.g. Sunita Sharma"
                   value={newFamilyForm.name}
                   onChange={(e) => setNewFamilyForm({ ...newFamilyForm, name: e.target.value })}
                   required
-                  className="block w-full px-3 py-2 border border-slate-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm text-slate-950"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1">Relation</label>
+                <label>Relation</label>
                 <select
                   value={newFamilyForm.relation}
                   onChange={(e) => setNewFamilyForm({ ...newFamilyForm, relation: e.target.value })}
-                  className="block w-full px-3 py-2 border border-slate-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm text-slate-950"
                 >
                   <option value="spouse">Spouse</option>
                   <option value="child">Child</option>
@@ -378,41 +341,30 @@ const ResidentDashboard = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1">Phone Number</label>
+                <label>Phone Number</label>
                 <input
                   type="text"
                   placeholder="e.g. +91 9876543210"
                   value={newFamilyForm.phone}
                   onChange={(e) => setNewFamilyForm({ ...newFamilyForm, phone: e.target.value })}
-                  className="block w-full px-3 py-2 border border-slate-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm text-slate-950"
                 />
               </div>
 
-              <div className="flex items-center gap-2 pt-2">
+              <div className="dashboard-inline-actions">
                 <input
                   id="emergency"
                   type="checkbox"
                   checked={newFamilyForm.isEmergencyContact}
                   onChange={(e) => setNewFamilyForm({ ...newFamilyForm, isEmergencyContact: e.target.checked })}
-                  className="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500 cursor-pointer"
                 />
-                <label htmlFor="emergency" className="text-sm font-semibold text-slate-700 cursor-pointer select-none">
-                  Mark as Emergency Contact
-                </label>
+                <label htmlFor="emergency">Mark as Emergency Contact</label>
               </div>
 
-              <div className="flex gap-3 justify-end pt-4 border-t border-slate-100">
-                <button
-                  type="button"
-                  className="bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold px-4 py-2 rounded-lg text-sm transition-colors focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                  onClick={() => setShowFamilyModal(false)}
-                >
+              <div className="dashboard-inline-actions">
+                <button type="button" className="btn btn-secondary" onClick={() => setShowFamilyModal(false)}>
                   Cancel
                 </button>
-                <button
-                  type="submit"
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2 rounded-lg text-sm transition-colors focus:ring-2 focus:ring-indigo-500 focus:outline-none shadow-sm"
-                >
+                <button type="submit" className="btn btn-primary">
                   Add Member
                 </button>
               </div>
@@ -420,7 +372,7 @@ const ResidentDashboard = () => {
           </div>
         </div>
       )}
-    </div>
+    </DashboardPage>
   );
 };
 

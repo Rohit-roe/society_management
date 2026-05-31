@@ -1,6 +1,43 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import {
+  BarChart3,
+  Bell,
+  Coins,
+  FileText,
+  FolderLock,
+  ListChecks,
+  MessageSquare,
+  Plus,
+  Siren,
+  Ticket,
+  Users,
+  Vote,
+  Wallet,
+  Wrench,
+} from 'lucide-react';
 import API from '../../api/axios';
+import {
+  DashboardActionGrid,
+  DashboardActionLink,
+  DashboardCard,
+  DashboardEmptyState,
+  DashboardHeader,
+  DashboardKpiCard,
+  DashboardKpiGrid,
+  DashboardPage,
+  DashboardSection,
+  DashboardStatusBadge,
+} from '../../components/common/DashboardSections';
+
+const formatCurrency = (value = 0) => `Rs. ${Number(value || 0).toLocaleString()}`;
+
+const statusTone = (status) => {
+  if (status === 'paid' || status === 'resolved') return 'success';
+  if (status === 'overdue' || status === 'urgent') return 'danger';
+  if (status === 'pending' || status === 'open' || status === 'in_progress') return 'warning';
+  return 'neutral';
+};
 
 const AdminDashboard = () => {
   const [residents, setResidents] = useState([]);
@@ -38,155 +75,175 @@ const AdminDashboard = () => {
     loadDashboard();
   }, []);
 
-  const pendingDuesCount = maintenance.filter((r) => r.status === 'pending').length;
-  const overdueDuesCount = maintenance.filter((r) => r.status === 'overdue').length;
-
   if (loading) return <p className="page-container">Loading admin control panel...</p>;
 
+  const activeResidents = residents.filter((r) => r.role === 'resident' && r.status === 'active').length;
+  const pendingDuesCount = maintenance.filter((r) => r.status === 'pending').length;
+  const overdueDuesCount = maintenance.filter((r) => r.status === 'overdue').length;
+  const openWorkCount = requests.length + tickets.length + overdueDuesCount;
+  const recentMaintenance = maintenance.slice(0, 3);
+  const recentNotices = notices.slice(0, 3);
+
   return (
-    <section className="page-container">
-      <div className="page-header-row" style={{ background: 'linear-gradient(135deg, #1a3c5e 0%, #1a5276 100%)', padding: '32px', borderRadius: '12px', color: '#fff', marginBottom: '32px', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}>
-        <div>
-          <h2 style={{ color: '#fff', marginBottom: '8px' }}>Society Administrator Panel</h2>
-          <p style={{ opacity: 0.9 }}>
-            Overview of operations, residents, finances, and governance logs.
-          </p>
-        </div>
-        {wallet && (
-          <div style={{ textAlign: 'right' }}>
-            <span style={{ fontSize: '0.85rem', opacity: 0.85 }}>SOCIETY WALLET</span>
-            <h3 style={{ color: '#fff', fontSize: '2rem', margin: '4px 0 0 0' }}>₹{wallet.balance.toLocaleString()}</h3>
-          </div>
-        )}
-      </div>
-
-      {/* KPI Cards Grid */}
-      <div className="stats-grid" style={{ marginBottom: '32px' }}>
-        <article className="stat-card">
-          <h4>Total Residents</h4>
-          <p style={{ fontSize: '1.8rem', fontWeight: 'bold', color: '#1a3c5e', marginTop: '8px' }}>
-            {residents.filter((r) => r.role === 'resident' && r.status === 'active').length}
-          </p>
-        </article>
-        <article className="stat-card pending">
-          <h4>Pending Dues</h4>
-          <p style={{ fontSize: '1.8rem', fontWeight: 'bold', color: '#b7950b', marginTop: '8px' }}>
-            {pendingDuesCount}
-          </p>
-        </article>
-        <article className="stat-card overdue">
-          <h4>Overdue Dues</h4>
-          <p style={{ fontSize: '1.8rem', fontWeight: 'bold', color: '#c0392b', marginTop: '8px' }}>
-            {overdueDuesCount}
-          </p>
-        </article>
-        <article className="stat-card pending" style={{ borderLeftColor: '#9a7d0a' }}>
-          <h4>Join Requests</h4>
-          <p style={{ fontSize: '1.8rem', fontWeight: 'bold', color: '#9a7d0a', marginTop: '8px' }}>
-            {requests.length}
-          </p>
-        </article>
-        <article className="stat-card">
-          <h4>Open Complaints</h4>
-          <p style={{ fontSize: '1.8rem', fontWeight: 'bold', color: '#2e86ab', marginTop: '8px' }}>
-            {tickets.length}
-          </p>
-        </article>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '24px', marginBottom: '32px' }}>
-        {/* Actionable alerts (Join Requests & Tickets) */}
-        <div>
-          {requests.length > 0 && (
-            <div className="card" style={{ borderLeft: '4px solid #b7950b', marginBottom: '24px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h3 style={{ color: '#b7950b' }}>Join Requests Pending Approval ({requests.length})</h3>
-                <Link to="/admin/residents" style={{ fontSize: '0.85rem', color: '#b7950b', fontWeight: '600' }}>
-                  Process Join Requests →
-                </Link>
-              </div>
-              <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {requests.slice(0, 3).map((r) => (
-                  <div key={r._id} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px', background: '#fcfcfc', border: '1px solid #f0f4f8', borderRadius: '4px' }}>
-                    <span style={{ fontSize: '0.9rem' }}>
-                      <strong>{r.name}</strong> ({r.role}) — Flat: {r.flatNumber || 'N/A'}
-                    </span>
-                  </div>
-                ))}
-              </div>
+    <DashboardPage>
+      <DashboardHeader
+        title="Society Administrator Panel"
+        subtitle="Overview of operations, residents, finances, and governance logs."
+        summary={
+          wallet && (
+            <div className="dashboard-header-summary">
+              <span>Society Wallet</span>
+              <strong>{formatCurrency(wallet.balance)}</strong>
             </div>
-          )}
+          )
+        }
+      />
 
-          <div className="card">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-              <h3 style={{ color: '#1a3c5e' }}>Unresolved Support Tickets ({tickets.length})</h3>
-              <Link to="/admin/support" style={{ fontSize: '0.85rem', color: '#2e86ab', fontWeight: '600' }}>
-                Manage Tickets →
-              </Link>
-            </div>
-            {tickets.length === 0 ? (
-              <p className="note">No open support tickets. All complaints resolved!</p>
+      <DashboardKpiGrid>
+        <DashboardKpiCard icon={Users} label="Active Residents" value={activeResidents} helper="Approved resident users" />
+        <DashboardKpiCard icon={Wrench} label="Pending Dues" value={pendingDuesCount} helper="Maintenance records" tone={pendingDuesCount ? 'warning' : 'default'} />
+        <DashboardKpiCard icon={Siren} label="Overdue Dues" value={overdueDuesCount} helper="Needs follow-up" tone={overdueDuesCount ? 'danger' : 'default'} />
+        <DashboardKpiCard icon={Users} label="Join Requests" value={requests.length} helper="Pending approvals" tone={requests.length ? 'warning' : 'default'} />
+        <DashboardKpiCard icon={Ticket} label="Open Complaints" value={tickets.length} helper="Unresolved support" tone={tickets.length ? 'warning' : 'default'} />
+        <DashboardKpiCard icon={Wallet} label="Wallet" value={wallet ? formatCurrency(wallet.balance) : 'Unavailable'} helper="Society balance" />
+      </DashboardKpiGrid>
+
+      <DashboardSection
+        title="Urgent Work"
+        description={`${openWorkCount} operational item${openWorkCount === 1 ? '' : 's'} need attention.`}
+        icon={ListChecks}
+        priority="urgent"
+      >
+        <div className="dashboard-two-column">
+          <DashboardCard emphasis={requests.length ? 'urgent' : 'normal'}>
+            <h4>Join Requests Pending Approval</h4>
+            {requests.length === 0 ? (
+              <DashboardEmptyState title="No join requests" message="Resident approval queue is clear." />
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {tickets.slice(0, 3).map((t) => (
-                  <div key={t._id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px', border: '1px solid #eef6fa', borderRadius: '6px' }}>
+              <ul className="dashboard-list">
+                {requests.slice(0, 3).map((request) => (
+                  <li key={request._id} className="dashboard-list-item">
                     <div>
-                      <strong style={{ fontSize: '0.9rem', color: '#333' }}>{t.title || t.subject}</strong>
-                      <span style={{ display: 'block', fontSize: '0.75rem', color: '#777', marginTop: '2px' }}>
-                        Flat {t.flatNumber || 'N/A'} | Priority: {t.priority}
-                      </span>
+                      <strong>{request.name}</strong>
+                      <span>{request.role} | Flat {request.flatNumber || 'N/A'}</span>
                     </div>
-                    <span
-                      style={{
-                        background: t.priority === 'urgent' ? '#fadbd8' : '#eef6fa',
-                        color: t.priority === 'urgent' ? '#c0392b' : '#666',
-                        padding: '2px 6px',
-                        borderRadius: '4px',
-                        fontSize: '0.75rem',
-                        fontWeight: '600',
-                      }}
-                    >
-                      {t.status}
-                    </span>
-                  </div>
+                    <Link to="/admin/residents" className="dashboard-link">Process -&gt;</Link>
+                  </li>
                 ))}
+              </ul>
+            )}
+          </DashboardCard>
+
+          <DashboardCard emphasis={tickets.length ? 'urgent' : 'normal'}>
+            <h4>Unresolved Support Tickets</h4>
+            {tickets.length === 0 ? (
+              <DashboardEmptyState title="No unresolved tickets" message="All visible complaints are resolved." />
+            ) : (
+              <ul className="dashboard-list">
+                {tickets.slice(0, 3).map((ticket) => (
+                  <li key={ticket._id} className="dashboard-list-item">
+                    <div>
+                      <strong>{ticket.title || ticket.subject}</strong>
+                      <span>Flat {ticket.flatNumber || 'N/A'} | Priority: {ticket.priority}</span>
+                    </div>
+                    <DashboardStatusBadge tone={statusTone(ticket.priority || ticket.status)} icon={Ticket}>{ticket.status}</DashboardStatusBadge>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {tickets.length > 0 && (
+              <div className="dashboard-inline-actions">
+                <Link to="/admin/support" className="dashboard-link">Manage Tickets -&gt;</Link>
               </div>
             )}
-          </div>
+          </DashboardCard>
         </div>
+      </DashboardSection>
 
-        {/* Quick Operations Links */}
-        <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          <h3 style={{ color: '#1a3c5e' }}>Admin Shortcuts</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-            <Link to="/admin/residents" style={{ padding: '14px 10px', background: '#eef6fa', color: '#1a3c5e', textDecoration: 'none', borderRadius: '6px', textAlign: 'center', fontWeight: '600', fontSize: '0.9rem' }}>
-              Residents Whitelist
-            </Link>
-            <Link to="/admin/finances" style={{ padding: '14px 10px', background: '#eef6fa', color: '#1a3c5e', textDecoration: 'none', borderRadius: '6px', textAlign: 'center', fontWeight: '600', fontSize: '0.9rem' }}>
-              Upload Expenses
-            </Link>
-            <Link to="/admin/voting" style={{ padding: '14px 10px', background: '#eef6fa', color: '#1a3c5e', textDecoration: 'none', borderRadius: '6px', textAlign: 'center', fontWeight: '600', fontSize: '0.9rem' }}>
-              Events & Polls
-            </Link>
-            <Link to="/admin/vault" style={{ padding: '14px 10px', background: '#eef6fa', color: '#1a3c5e', textDecoration: 'none', borderRadius: '6px', textAlign: 'center', fontWeight: '600', fontSize: '0.9rem' }}>
-              Document Vault
-            </Link>
-            <Link to="/admin/penalties" style={{ padding: '14px 10px', background: '#eef6fa', color: '#1a3c5e', textDecoration: 'none', borderRadius: '6px', textAlign: 'center', fontWeight: '600', fontSize: '0.9rem' }}>
-              Issue Fines
-            </Link>
-            <Link to="/admin/audit-logs" style={{ padding: '14px 10px', background: '#eef6fa', color: '#1a3c5e', textDecoration: 'none', borderRadius: '6px', textAlign: 'center', fontWeight: '600', fontSize: '0.9rem' }}>
-              Audit Logs
-            </Link>
-            <Link to="/admin/notices" style={{ padding: '14px 10px', background: '#eef6fa', color: '#1a3c5e', textDecoration: 'none', borderRadius: '6px', textAlign: 'center', fontWeight: '600', fontSize: '0.9rem' }}>
-              Post notices
-            </Link>
-            <Link to="/admin/maintenance" style={{ padding: '14px 10px', background: '#eef6fa', color: '#1a3c5e', textDecoration: 'none', borderRadius: '6px', textAlign: 'center', fontWeight: '600', fontSize: '0.9rem' }}>
-              Dues Manager
-            </Link>
-          </div>
+      <DashboardSection
+        title="Recent Activity"
+        description="Latest notices and maintenance records."
+        icon={MessageSquare}
+      >
+        <div className="dashboard-two-column">
+          <DashboardCard>
+            <h4>Recent Notices</h4>
+            {recentNotices.length === 0 ? (
+              <DashboardEmptyState title="No notices posted" message="Published notices will appear here." />
+            ) : (
+              <ul className="dashboard-list">
+                {recentNotices.map((notice) => (
+                  <li key={notice._id} className="dashboard-list-item">
+                    <div>
+                      <strong>{notice.title}</strong>
+                      <span>{new Date(notice.createdAt).toLocaleDateString()}</span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </DashboardCard>
+
+          <DashboardCard>
+            <h4>Maintenance Snapshot</h4>
+            {recentMaintenance.length === 0 ? (
+              <DashboardEmptyState title="No maintenance records" message="Uploaded dues will appear here." />
+            ) : (
+              <ul className="dashboard-list">
+                {recentMaintenance.map((record) => (
+                  <li key={record._id} className="dashboard-list-item">
+                    <div>
+                      <strong>{formatCurrency(record.amount)}</strong>
+                      <span>Flat {record.flatNumber || 'N/A'} | {record.month}/{record.year}</span>
+                    </div>
+                    <DashboardStatusBadge tone={statusTone(record.status)} icon={Wrench}>{record.status}</DashboardStatusBadge>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </DashboardCard>
         </div>
-      </div>
-    </section>
+      </DashboardSection>
+
+      <DashboardSection
+        title="Quick Actions"
+        description="High-frequency society administration tools."
+        icon={Plus}
+        priority="tertiary"
+      >
+        <DashboardActionGrid>
+          <DashboardActionLink to="/admin/residents" icon={Users} title="Residents" description="Approve and manage users" />
+          <DashboardActionLink to="/admin/finances" icon={Coins} title="Finances" description="Wallet and expenses" />
+          <DashboardActionLink to="/admin/voting" icon={Vote} title="Events & Polls" description="Community decisions" />
+          <DashboardActionLink to="/admin/vault" icon={FolderLock} title="Document Vault" description="Society documents" />
+          <DashboardActionLink to="/admin/penalties" icon={Siren} title="Issue Fines" description="Penalties ledger" />
+          <DashboardActionLink to="/admin/audit-logs" icon={FileText} title="Audit Logs" description="Governance trail" />
+          <DashboardActionLink to="/admin/notices" icon={Bell} title="Post Notices" description="Resident announcements" />
+          <DashboardActionLink to="/admin/maintenance" icon={Wrench} title="Dues Manager" description="Maintenance billing" />
+        </DashboardActionGrid>
+      </DashboardSection>
+
+      <DashboardSection
+        title="Secondary Content"
+        description="Operational summary for the current society."
+        icon={BarChart3}
+      >
+        <div className="dashboard-card-grid">
+          <DashboardCard>
+            <h4>Resident Base</h4>
+            <p>{activeResidents} active resident accounts are currently available for society workflows.</p>
+          </DashboardCard>
+          <DashboardCard>
+            <h4>Financial Follow-up</h4>
+            <p>{pendingDuesCount + overdueDuesCount} dues records are pending or overdue.</p>
+          </DashboardCard>
+          <DashboardCard>
+            <h4>Support Load</h4>
+            <p>{tickets.length} complaint{tickets.length === 1 ? '' : 's'} remain open or in progress.</p>
+          </DashboardCard>
+        </div>
+      </DashboardSection>
+    </DashboardPage>
   );
 };
 

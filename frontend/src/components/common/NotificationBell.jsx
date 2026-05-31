@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Bell } from 'lucide-react';
 import { useSocket } from '../../context/SocketContext';
 import API from '../../api/axios';
 
@@ -32,7 +33,7 @@ const NotificationBell = () => {
       onClick={() => navigate('/notifications')}
       aria-label="Notifications"
     >
-      🔔
+      <Bell className="nav-icon" aria-hidden="true" />
       {unread > 0 && <span className="bell-badge">{unread > 9 ? '9+' : unread}</span>}
     </button>
   );

@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
 import {
   BarChart,
   Bar,
@@ -10,7 +9,22 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts';
+import { BarChart3, Building2, Calendar, FileText, ListChecks, MessageSquare, Plus, Siren, Users, Vote, Wallet } from 'lucide-react';
 import API from '../../api/axios';
+import {
+  DashboardActionGrid,
+  DashboardActionLink,
+  DashboardCard,
+  DashboardEmptyState,
+  DashboardHeader,
+  DashboardKpiCard,
+  DashboardKpiGrid,
+  DashboardPage,
+  DashboardSection,
+  DashboardStatusBadge,
+} from '../../components/common/DashboardSections';
+
+const formatCurrency = (value = 0) => `Rs. ${Number(value || 0).toLocaleString()}`;
 
 const AppAdminDashboard = () => {
   const [stats, setStats] = useState(null);
@@ -74,190 +88,178 @@ const AppAdminDashboard = () => {
 
   if (loading) return <p className="page-container">Loading admin dashboard...</p>;
 
+  const pendingRequests = requests.filter((request) => request.status === 'pending');
+
   return (
-    <section className="page-container">
-      <div className="page-header-row">
-        <h2>App Super Admin Dashboard</h2>
-        <span style={{ fontSize: '0.9rem', color: '#666' }}>System Control Panel</span>
-      </div>
+    <DashboardPage>
+      <DashboardHeader
+        title="App Super Admin Dashboard"
+        subtitle="System control panel for societies, users, requests, and platform-wide operational health."
+        summary={
+          <div className="dashboard-header-summary">
+            <span>Pending Requests</span>
+            <strong>{pendingRequests.length}</strong>
+          </div>
+        }
+      />
 
       {error && <p className="error-msg">{error}</p>}
       {success && <p className="success-msg">{success}</p>}
 
       {stats && (
-        <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', marginBottom: '32px' }}>
-          <article className="stat-card">
-            <h4>Total Societies</h4>
-            <p style={{ fontSize: '1.8rem', fontWeight: 'bold', color: '#1a3c5e', marginTop: '8px' }}>
-              {stats.societyCount}
-            </p>
-          </article>
-          <article className="stat-card">
-            <h4>Platform Users</h4>
-            <p style={{ fontSize: '1.8rem', fontWeight: 'bold', color: '#1a3c5e', marginTop: '8px' }}>
-              {stats.userCount}
-            </p>
-          </article>
-          <article className="stat-card pending">
-            <h4>Active Complaints</h4>
-            <p style={{ fontSize: '1.8rem', fontWeight: 'bold', color: '#9a7d0a', marginTop: '8px' }}>
-              {stats.activeComplaints}
-            </p>
-          </article>
-          <article className="stat-card">
-            <h4>Visitor Records</h4>
-            <p style={{ fontSize: '1.8rem', fontWeight: 'bold', color: '#2e86ab', marginTop: '8px' }}>
-              {stats.visitorCount}
-            </p>
-          </article>
-          <article className="stat-card">
-            <h4>Facility Bookings</h4>
-            <p style={{ fontSize: '1.8rem', fontWeight: 'bold', color: '#2e86ab', marginTop: '8px' }}>
-              {stats.bookingsCount}
-            </p>
-          </article>
-          <article className="stat-card overdue">
-            <h4>Outstanding Dues</h4>
-            <p style={{ fontSize: '1.8rem', fontWeight: 'bold', color: '#dc2626', marginTop: '8px' }}>
-              ₹{stats.totalPendingDues?.toLocaleString() || 0}
-            </p>
-          </article>
-          <article className="stat-card">
-            <h4>Total Poll Votes</h4>
-            <p style={{ fontSize: '1.8rem', fontWeight: 'bold', color: '#2563eb', marginTop: '8px' }}>
-              {stats.totalPollVotes || 0}
-            </p>
-          </article>
-          <article className="stat-card overdue">
-            <h4>Cross-Society Spending</h4>
-            <p style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#c0392b', marginTop: '8px' }}>
-              ₹{stats.totalExpenses.toLocaleString()}
-            </p>
-          </article>
-        </div>
+        <DashboardKpiGrid>
+          <DashboardKpiCard icon={Building2} label="Total Societies" value={stats.societyCount} helper="Registered societies" />
+          <DashboardKpiCard icon={Users} label="Platform Users" value={stats.userCount} helper="All user accounts" />
+          <DashboardKpiCard icon={MessageSquare} label="Active Complaints" value={stats.activeComplaints} helper="Cross-society support load" tone={stats.activeComplaints ? 'warning' : 'default'} />
+          <DashboardKpiCard icon={BarChart3} label="Visitor Records" value={stats.visitorCount} helper="Gate activity records" />
+          <DashboardKpiCard icon={Calendar} label="Facility Bookings" value={stats.bookingsCount} helper="Shared facility reservations" />
+          <DashboardKpiCard icon={Siren} label="Outstanding Dues" value={formatCurrency(stats.totalPendingDues)} helper="Pending maintenance value" tone={stats.totalPendingDues ? 'danger' : 'default'} />
+          <DashboardKpiCard icon={Vote} label="Total Poll Votes" value={stats.totalPollVotes || 0} helper="Governance participation" />
+          <DashboardKpiCard icon={Wallet} label="Cross-Society Spending" value={formatCurrency(stats.totalExpenses)} helper="Recorded expenses" />
+        </DashboardKpiGrid>
       )}
 
-      {stats?.highDefaulterSocieties?.length > 0 && (
-        <div className="card" style={{ marginBottom: '32px' }}>
-          <h3>Top Defaulting Societies (Outstanding Maintenance Dues)</h3>
-          <div style={{ marginTop: '16px', height: '260px' }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={stats.highDefaulterSocieties}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="societyName" />
-                <YAxis />
-                <Tooltip formatter={(value) => `₹${value.toLocaleString()}`} />
-                <Legend />
-                <Bar dataKey="unpaidAmount" fill="#ef4444" name="Unpaid Dues (INR)" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      )}
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '32px', marginBottom: '32px' }}>
-        <div>
-          <h3>Pending Society Requests</h3>
-          <div style={{ marginTop: '12px' }}>
-            {requests.filter(r => r.status === 'pending').length === 0 ? (
-              <p className="note">No pending society requests.</p>
-            ) : (
-              <div style={{ display: 'grid', gap: '16px' }}>
-                {requests.filter(r => r.status === 'pending').map((req) => (
-                  <article key={req._id} className="card" style={{ borderLeft: '4px solid #9a7d0a' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
-                      <div>
-                        <h4 style={{ color: '#1a3c5e', fontSize: '1.1rem' }}>{req.name}</h4>
-                        <p style={{ fontSize: '0.9rem', color: '#555', marginTop: '4px' }}>
-                          <strong>Location:</strong> {req.address}, {req.city}
-                        </p>
-                        <p style={{ fontSize: '0.9rem', color: '#555' }}>
-                          <strong>Scale:</strong> {req.totalFlats} Flats | {req.estimatedResidents || 0} Est. Residents
-                        </p>
-                        <p style={{ fontSize: '0.9rem', color: '#555' }}>
-                          <strong>Requested By:</strong> {req.requestedBy?.name} ({req.requestedBy?.email}) | Contact: {req.contactNumber || req.requestedBy?.phone || 'N/A'}
-                        </p>
-                        {req.proofDocument && (
-                          <p style={{ fontSize: '0.9rem', marginTop: '8px' }}>
-                            <a href={req.proofDocument} target="_blank" rel="noreferrer" style={{ color: '#2e86ab', fontWeight: '600' }}>
-                              View Proof Document
-                            </a>
-                          </p>
-                        )}
-                        {req.description && (
-                          <p style={{ fontSize: '0.85rem', color: '#777', fontStyle: 'italic', marginTop: '8px' }}>
-                            "{req.description}"
-                          </p>
-                        )}
-                      </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignSelf: 'flex-start' }}>
-                        <button
-                          type="button"
-                          onClick={() => handleApprove(req._id)}
-                          style={{ background: '#1e7a4a', fontWeight: '600' }}
-                        >
-                          Approve Society
-                        </button>
-                        <button
-                          type="button"
-                          className="btn-danger"
-                          onClick={() => setRejectionId(req._id)}
-                          style={{ fontWeight: '600' }}
-                        >
-                          Reject
-                        </button>
-                      </div>
-                    </div>
-
-                    {rejectionId === req._id && (
-                      <form onSubmit={(e) => handleRejectSubmit(e, req._id)} style={{ marginTop: '16px', background: '#fadbd8', padding: '16px', borderRadius: '4px' }}>
-                        <label style={{ display: 'block', fontWeight: '600', marginBottom: '8px', color: '#c0392b' }}>
-                          Rejection Reason:
-                        </label>
-                        <input
-                          placeholder="Provide rejection reason..."
-                          value={rejectionReason}
-                          onChange={(e) => setRejectionReason(e.target.value)}
-                          required
-                          style={{ marginBottom: '8px' }}
-                        />
-                        <div style={{ display: 'flex', gap: '8px' }}>
-                          <button type="submit" className="btn-danger" style={{ padding: '6px 12px', fontSize: '0.85rem' }}>
-                            Confirm Rejection
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setRejectionId('');
-                              setRejectionReason('');
-                            }}
-                            style={{ background: '#777', color: '#fff', padding: '6px 12px', fontSize: '0.85rem' }}
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      </form>
+      <DashboardSection
+        title="Urgent Work"
+        description="Society onboarding requests that require platform approval."
+        icon={ListChecks}
+        priority="urgent"
+      >
+        {pendingRequests.length === 0 ? (
+          <DashboardEmptyState title="No pending society requests" message="New society registration requests will appear here." />
+        ) : (
+          <div className="dashboard-plain-list">
+            {pendingRequests.map((request) => (
+              <DashboardCard key={request._id} emphasis="urgent">
+                <div className="dashboard-list-item">
+                  <div>
+                    <h4>{request.name}</h4>
+                    <p><strong>Location:</strong> {request.address}, {request.city}</p>
+                    <p><strong>Scale:</strong> {request.totalFlats} flats | {request.estimatedResidents || 0} estimated residents</p>
+                    <p>
+                      <strong>Requested By:</strong> {request.requestedBy?.name} ({request.requestedBy?.email}) | Contact:{' '}
+                      {request.contactNumber || request.requestedBy?.phone || 'N/A'}
+                    </p>
+                    {request.proofDocument && (
+                      <p>
+                        <a href={request.proofDocument} target="_blank" rel="noreferrer" className="dashboard-link">
+                          View Proof Document -&gt;
+                        </a>
+                      </p>
                     )}
-                  </article>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
+                    {request.description && <p>{request.description}</p>}
+                  </div>
+                  <DashboardStatusBadge tone="warning" icon={Siren}>Pending</DashboardStatusBadge>
+                </div>
 
-      <div className="quick-links" style={{ borderTop: '1px solid #c5d8e8', paddingTop: '20px' }}>
-        <Link to="/app-admin/societies" style={{ padding: '10px 20px', background: '#1a3c5e', color: '#fff', borderRadius: '4px', textDecoration: 'none', fontWeight: '600' }}>
-          Manage Societies
-        </Link>
-        <Link to="/app-admin/users" style={{ padding: '10px 20px', background: '#1a3c5e', color: '#fff', borderRadius: '4px', textDecoration: 'none', fontWeight: '600' }}>
-          Manage Users
-        </Link>
-        <Link to="/app-admin/audit-logs" style={{ padding: '10px 20px', background: '#2e86ab', color: '#fff', borderRadius: '4px', textDecoration: 'none', fontWeight: '600' }}>
-          View Audit Logs
-        </Link>
-      </div>
-    </section>
+                <div className="dashboard-inline-actions">
+                  <button type="button" className="btn btn-primary" onClick={() => handleApprove(request._id)}>
+                    Approve Society
+                  </button>
+                  <button type="button" className="btn btn-danger" onClick={() => setRejectionId(request._id)}>
+                    Reject
+                  </button>
+                </div>
+
+                {rejectionId === request._id && (
+                  <form onSubmit={(e) => handleRejectSubmit(e, request._id)} className="dashboard-reject-form">
+                    <label>Rejection Reason</label>
+                    <input
+                      placeholder="Provide rejection reason..."
+                      value={rejectionReason}
+                      onChange={(e) => setRejectionReason(e.target.value)}
+                      required
+                    />
+                    <div className="dashboard-inline-actions">
+                      <button type="submit" className="btn btn-danger">
+                        Confirm Rejection
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        onClick={() => {
+                          setRejectionId('');
+                          setRejectionReason('');
+                        }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </DashboardCard>
+            ))}
+          </div>
+        )}
+      </DashboardSection>
+
+      <DashboardSection
+        title="Recent Activity"
+        description="Platform-wide financial risk and defaulting society trends."
+        icon={BarChart3}
+      >
+        {stats?.highDefaulterSocieties?.length > 0 ? (
+          <DashboardCard>
+            <h4>Top Defaulting Societies</h4>
+            <div className="dashboard-chart-wrap">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={stats.highDefaulterSocieties}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                  <XAxis dataKey="societyName" stroke="var(--text-secondary)" />
+                  <YAxis stroke="var(--text-secondary)" />
+                  <Tooltip
+                    formatter={(value) => formatCurrency(value)}
+                    contentStyle={{
+                      background: 'var(--bg-card)',
+                      border: '1px solid var(--border)',
+                      color: 'var(--text-primary)',
+                    }}
+                  />
+                  <Legend />
+                  <Bar dataKey="unpaidAmount" fill="var(--primary)" name="Unpaid Dues" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </DashboardCard>
+        ) : (
+          <DashboardEmptyState title="No defaulting society chart" message="Outstanding dues trends will appear when available." />
+        )}
+      </DashboardSection>
+
+      <DashboardSection
+        title="Quick Actions"
+        description="Core platform administration tools."
+        icon={Plus}
+        priority="tertiary"
+      >
+        <DashboardActionGrid>
+          <DashboardActionLink to="/app-admin/societies" icon={Building2} title="Manage Societies" description="Review platform societies" />
+          <DashboardActionLink to="/app-admin/users" icon={Users} title="Manage Users" description="Inspect platform users" />
+          <DashboardActionLink to="/app-admin/audit-logs" icon={FileText} title="Audit Logs" description="Review system events" />
+        </DashboardActionGrid>
+      </DashboardSection>
+
+      <DashboardSection
+        title="Secondary Content"
+        description="Platform overview derived from current system statistics."
+        icon={Building2}
+      >
+        <div className="dashboard-card-grid">
+          <DashboardCard>
+            <h4>Community Scale</h4>
+            <p>{stats?.societyCount || 0} societies and {stats?.userCount || 0} users are represented on the platform.</p>
+          </DashboardCard>
+          <DashboardCard>
+            <h4>Operational Load</h4>
+            <p>{stats?.activeComplaints || 0} active complaint{stats?.activeComplaints === 1 ? '' : 's'} and {stats?.bookingsCount || 0} facility bookings are recorded.</p>
+          </DashboardCard>
+          <DashboardCard>
+            <h4>Financial Exposure</h4>
+            <p>{formatCurrency(stats?.totalPendingDues)} remains outstanding across societies.</p>
+          </DashboardCard>
+        </div>
+      </DashboardSection>
+    </DashboardPage>
   );
 };
 

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { Bot, X } from 'lucide-react';
 import API from '../../api/axios';
 
 const ChatbotWidget = () => {
@@ -13,10 +14,11 @@ const ChatbotWidget = () => {
     API.get('/chat/history')
       .then((res) => {
         if (res.data.length > 0) setMessages(res.data);
-        else
+        else {
           setMessages([
             { role: 'assistant', content: 'Hi! I am your society assistant. How can I help you today?' },
           ]);
+        }
       })
       .catch(() =>
         setMessages([
@@ -92,8 +94,8 @@ const ChatbotWidget = () => {
           </div>
         </div>
       )}
-      <button type="button" className="chatbot-fab" onClick={() => setOpen((o) => !o)}>
-        {open ? '✕' : '🤖'}
+      <button type="button" className="chatbot-fab" onClick={() => setOpen((o) => !o)} aria-label="Toggle society assistant">
+        {open ? <X className="nav-icon" aria-hidden="true" /> : <Bot className="nav-icon" aria-hidden="true" />}
       </button>
     </div>
   );
