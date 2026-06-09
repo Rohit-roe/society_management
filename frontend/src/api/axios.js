@@ -4,9 +4,17 @@ const getNormalizedApiUrl = () => {
   let url = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
   if (url && !/^https?:\/\//i.test(url) && !url.startsWith('/')) {
     if (url.startsWith('localhost') || url.startsWith('127.0.0.1')) {
-      return `http://${url}`;
+      url = `http://${url}`;
+    } else {
+      url = `https://${url}`;
     }
-    return `https://${url}`;
+  }
+  if (url && !url.endsWith('/api')) {
+    if (url.endsWith('/api/')) {
+      url = url.slice(0, -1);
+    } else {
+      url = url.replace(/\/$/, '') + '/api';
+    }
   }
   return url;
 };
