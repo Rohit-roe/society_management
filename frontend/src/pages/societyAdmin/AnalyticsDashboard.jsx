@@ -17,7 +17,6 @@ import {
 import API from '../../api/axios';
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-const PIE_COLORS = { paid: '#1E7A4A', pending: '#9A7D0A', overdue: '#C0392B' };
 
 const AnalyticsDashboard = () => {
   const [revenue, setRevenue] = useState([]);
@@ -29,35 +28,108 @@ const AnalyticsDashboard = () => {
   const [maintenance, setMaintenance] = useState([]);
   const [visitors, setVisitors] = useState([]);
   const [noticeEngagement, setNoticeEngagement] = useState([]);
-  const [loading, setLoading] = useState(true);
 
+  // Section Loading States
+  const [summaryLoading, setSummaryLoading] = useState(true);
+  const [revenueLoading, setRevenueLoading] = useState(true);
+  const [collectionLoading, setCollectionLoading] = useState(true);
+  const [trafficLoading, setTrafficLoading] = useState(true);
+  const [facilitiesLoading, setFacilitiesLoading] = useState(true);
+  const [noticesLoading, setNoticesLoading] = useState(true);
+
+  // Dynamic Theme Colors State
+  const [colors, setColors] = useState({
+    primary: '#2E86AB',
+    success: '#1E7A4A',
+    warning: '#9A7D0A',
+    danger: '#C0392B',
+    textSecondary: '#6d5f56'
+  });
+
+  // Track Theme changes in document body class
   useEffect(() => {
-    Promise.all([
-      API.get('/analytics/revenue'),
-      API.get('/analytics/collection'),
-      API.get('/analytics/visitors'),
-      API.get('/analytics/facilities'),
-      API.get('/analytics/summary'),
-      API.get('/analytics/notices'),
-      API.get('/maintenance/analytics'),
-      API.get('/maintenance'),
-      API.get('/visitors'),
-    ])
-      .then(([rev, col, traf, fac, sum, notices, agg, maint, vis]) => {
-        setRevenue(rev.data);
-        setCollection(col.data);
-        setTraffic(traf.data);
-        setFacilities(fac.data);
-        setSummary(sum.data);
-        setNoticeEngagement(notices.data);
-        setAggData(agg.data);
-        setMaintenance(maint.data);
-        setVisitors(vis.data);
-      })
-      .finally(() => setLoading(false));
+    const rootStyle = getComputedStyle(document.documentElement);
+    const updateColors = () => {
+      const p = rootStyle.getPropertyValue('--primary').trim() || '#2E86AB';
+      const s = rootStyle.getPropertyValue('--status-success-text').trim() || '#1E7A4A';
+      const w = rootStyle.getPropertyValue('--status-warning-text').trim() || '#9A7D0A';
+      const d = rootStyle.getPropertyValue('--status-danger-text').trim() || '#C0392B';
+      const ts = rootStyle.getPropertyValue('--text-secondary').trim() || '#6d5f56';
+      setColors({
+        primary: p,
+        success: s,
+        warning: w,
+        danger: d,
+        textSecondary: ts
+      });
+    };
+
+    updateColors();
+
+    const observer = new MutationObserver(() => {
+      updateColors();
+    });
+    observer.observe(document.body, { attributes: true, attributeFilter: ['class'] });
+
+    return () => observer.disconnect();
   }, []);
 
-  if (loading) return <p className="page-container">Loading analytics...</p>;
+  // Independent API Requests
+  useEffect(() => {
+    // 1. Summary Card Data
+    API.get('/analytics/summary')
+      .then((res) => setSummary(res.data))
+      .catch((err) => console.error('Summary API error:', err))
+      .finally(() => setSummaryLoading(false));
+
+    // 2. Revenue & Monthly Collection
+    Promise.all([
+      API.get('/analytics/revenue'),
+      API.get('/maintenance/analytics')
+    ])
+      .then(([rev, agg]) => {
+        setRevenue(rev.data);
+        setAggData(agg.data);
+      })
+      .catch((err) => console.error('Revenue API error:', err))
+      .finally(() => setRevenueLoading(false));
+
+    // 3. Visitor Traffic (Line chart)
+    Promise.all([
+      API.get('/analytics/visitors'),
+      API.get('/visitors')
+    ])
+      .then(([traf, vis]) => {
+        setTraffic(traf.data);
+        setVisitors(vis.data);
+      })
+      .catch((err) => console.error('Visitors API error:', err))
+      .finally(() => setTrafficLoading(false));
+
+    // 4. Payment Status Collection (Pie chart)
+    Promise.all([
+      API.get('/analytics/collection'),
+      API.get('/maintenance')
+    ])
+      .then(([col, maint]) => {
+        setCollection(col.data);
+        setMaintenance(maint.data);
+      })
+      .catch((err) => console.error('Collection API error:', err))
+      .finally(() => setCollectionLoading(false));
+
+    // 5. Facility Usage
+    API.get('/analytics/facilities')
+      .then((res) => setFacilities(res.data))
+      .catch((err) => console.error('Facilities API error:', err))
+      .finally(() => setFacilitiesLoading(false));
+
+    // 6. Notice board activity
+    API.get('/analytics/notices')
+      .then((res) => setNoticeEngagement(res.data))
+      .catch((err) => console.error('Notices API error:', err))
+      .finally(() => setNoticesLoading(false));
+  }, []);
 
   const monthlyData = aggData.reduce((acc, item) => {
     const key = `${MONTH_NAMES[item._id.month - 1]} ${item._id.year}`;
@@ -91,90 +163,119 @@ const AnalyticsDashboard = () => {
   return (
     <div className="page-container">
       <h2>Analytics Dashboard</h2>
-      {summary && (
-        <div className="stats-grid">
-          <article className="stat-card">
-            <h4>Residents</h4>
-            <p>
-              {summary.totalResidents} / {summary.totalFlats} flats
-            </p>
-            <small>{summary.occupancyPercent}% occupancy</small>
-          </article>
-          <article className="stat-card">
-            <h4>Vacant Flats</h4>
-            <p>{summary.vacantFlats}</p>
-          </article>
-          <article className="stat-card pending">
-            <h4>Pending Dues</h4>
-            <p>{summary.pendingDues}</p>
-          </article>
-          <article className="stat-card overdue">
-            <h4>Overdue</h4>
-            <p>{summary.overdueCount}</p>
-          </article>
+      
+      {summaryLoading ? (
+        <div className="stats-grid" style={{ marginBottom: '24px' }}>
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="skeleton-box" style={{ height: 110, borderRadius: 'var(--radius)' }} />
+          ))}
         </div>
+      ) : (
+        summary && (
+          <div className="stats-grid">
+            <article className="stat-card">
+              <h4>Residents</h4>
+              <p>
+                {summary.totalResidents} / {summary.totalFlats} flats
+              </p>
+              <small>{summary.occupancyPercent}% occupancy</small>
+            </article>
+            <article className="stat-card">
+              <h4>Vacant Flats</h4>
+              <p>{summary.vacantFlats}</p>
+            </article>
+            <article className="stat-card pending">
+              <h4>Pending Dues</h4>
+              <p>{summary.pendingDues}</p>
+            </article>
+            <article className="stat-card overdue">
+              <h4>Overdue</h4>
+              <p>{summary.overdueCount}</p>
+            </article>
+          </div>
+        )
       )}
 
       <h3>Monthly Maintenance Collection (INR)</h3>
-      <ResponsiveContainer width="100%" height={300}>
-        <BarChart data={monthlyData.length ? monthlyData : revenue}>
-          <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey="name" />
-          <YAxis />
-          <Tooltip />
-          <Legend />
-          <Bar dataKey="paid" fill="#1E7A4A" name="Paid" />
-          <Bar dataKey="pending" fill="#9A7D0A" name="Pending" />
-          <Bar dataKey="overdue" fill="#C0392B" name="Overdue" />
-          {revenue.length > 0 && !monthlyData.length && <Bar dataKey="revenue" fill="#2E86AB" name="Revenue" />}
-        </BarChart>
-      </ResponsiveContainer>
+      {revenueLoading ? (
+        <div className="skeleton-box" style={{ height: 300, marginBottom: '24px', borderRadius: 'var(--radius)' }} />
+      ) : (
+        <ResponsiveContainer width="100%" height={300}>
+          <BarChart data={monthlyData.length ? monthlyData : revenue}>
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+            <XAxis dataKey="name" stroke={colors.textSecondary} />
+            <YAxis stroke={colors.textSecondary} />
+            <Tooltip contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+            <Legend />
+            <Bar dataKey="paid" fill={colors.success} name="Paid" />
+            <Bar dataKey="pending" fill={colors.warning} name="Pending" />
+            <Bar dataKey="overdue" fill={colors.danger} name="Overdue" />
+            {revenue.length > 0 && !monthlyData.length && <Bar dataKey="revenue" fill={colors.primary} name="Revenue" />}
+          </BarChart>
+        </ResponsiveContainer>
+      )}
 
       <h3>Visitor Traffic — Last 7 Days</h3>
-      <ResponsiveContainer width="100%" height={260}>
-        <LineChart data={traffic.length ? traffic.slice(-7) : last7}>
-          <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey={traffic.length ? 'date' : 'name'} />
-          <YAxis allowDecimals={false} />
-          <Tooltip />
-          <Line type="monotone" dataKey={traffic.length ? 'visitors' : 'visitors'} stroke="#2E86AB" strokeWidth={2} />
-        </LineChart>
-      </ResponsiveContainer>
+      {trafficLoading ? (
+        <div className="skeleton-box" style={{ height: 260, marginBottom: '24px', borderRadius: 'var(--radius)' }} />
+      ) : (
+        <ResponsiveContainer width="100%" height={260}>
+          <LineChart data={traffic.length ? traffic.slice(-7) : last7}>
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+            <XAxis dataKey={traffic.length ? 'date' : 'name'} stroke={colors.textSecondary} />
+            <YAxis allowDecimals={false} stroke={colors.textSecondary} />
+            <Tooltip contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+            <Line type="monotone" dataKey="visitors" stroke={colors.primary} strokeWidth={2} />
+          </LineChart>
+        </ResponsiveContainer>
+      )}
 
       <h3>Payment Status (Current Month)</h3>
-      <ResponsiveContainer width="100%" height={260}>
-        <PieChart>
-          <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} label>
-            {pieData.map((entry) => (
-              <Cell key={entry.name} fill={PIE_COLORS[entry.name] || '#888'} />
-            ))}
-          </Pie>
-          <Tooltip />
-          <Legend />
-        </PieChart>
-      </ResponsiveContainer>
+      {collectionLoading ? (
+        <div className="skeleton-box" style={{ height: 260, marginBottom: '24px', borderRadius: 'var(--radius)' }} />
+      ) : (
+        <ResponsiveContainer width="100%" height={260}>
+          <PieChart>
+            <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} label>
+              {pieData.map((entry) => (
+                <Cell key={entry.name} fill={entry.name === 'paid' ? colors.success : entry.name === 'pending' ? colors.warning : colors.danger} />
+              ))}
+            </Pie>
+            <Tooltip contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+            <Legend />
+          </PieChart>
+        </ResponsiveContainer>
+      )}
 
       <h3>Facility Usage (Approved)</h3>
-      <ResponsiveContainer width="100%" height={260}>
-        <BarChart data={facilities}>
-          <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey="facility" />
-          <YAxis allowDecimals={false} />
-          <Tooltip />
-          <Bar dataKey="bookings" fill="#6C3483" />
-        </BarChart>
-      </ResponsiveContainer>
+      {facilitiesLoading ? (
+        <div className="skeleton-box" style={{ height: 260, marginBottom: '24px', borderRadius: 'var(--radius)' }} />
+      ) : (
+        <ResponsiveContainer width="100%" height={260}>
+          <BarChart data={facilities}>
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+            <XAxis dataKey="facility" stroke={colors.textSecondary} />
+            <YAxis allowDecimals={false} stroke={colors.textSecondary} />
+            <Tooltip contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+            <Bar dataKey="bookings" fill={colors.primary} />
+          </BarChart>
+        </ResponsiveContainer>
+      )}
 
       <h3>Notice Board Activity (Last 90 Days)</h3>
-      <ResponsiveContainer width="100%" height={280}>
-        <BarChart data={noticeEngagement} layout="vertical">
-          <CartesianGrid strokeDasharray="3 3" />
-          <XAxis type="number" allowDecimals={false} />
-          <YAxis type="category" dataKey="name" width={120} />
-          <Tooltip />
-          <Bar dataKey="engagement" fill="#2E86AB" name="Notices posted" />
-        </BarChart>
-      </ResponsiveContainer>
+      {noticesLoading ? (
+        <div className="skeleton-box" style={{ height: 280, marginBottom: '24px', borderRadius: 'var(--radius)' }} />
+      ) : (
+        <ResponsiveContainer width="100%" height={280}>
+          <BarChart data={noticeEngagement} layout="vertical">
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+            <XAxis type="number" allowDecimals={false} stroke={colors.textSecondary} />
+            <YAxis type="category" dataKey="name" width={120} stroke={colors.textSecondary} />
+            <Tooltip contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+            <Bar dataKey="engagement" fill={colors.primary} name="Notices posted" />
+          </BarChart>
+        </ResponsiveContainer>
+      )}
     </div>
   );
 };

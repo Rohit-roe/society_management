@@ -2,14 +2,17 @@ import { useEffect, useState } from 'react';
 import VisitorLogPage from '../resident/VisitorLogPage';
 import API from '../../api/axios';
 import { BookOpen, CheckCircle2, Clock, DoorOpen, ListChecks, Plus, QrCode, Users } from 'lucide-react';
+import ActivityFeed from '../../components/common/ActivityFeed';
 import {
   DashboardActionGrid,
   DashboardActionLink,
   DashboardCard,
+  DashboardCardSkeleton,
   DashboardEmptyState,
   DashboardHeader,
   DashboardKpiCard,
   DashboardKpiGrid,
+  DashboardKpiSkeleton,
   DashboardPage,
   DashboardSection,
   DashboardStatusBadge,
@@ -17,14 +20,45 @@ import {
 
 const SecurityDashboard = () => {
   const [visitors, setVisitors] = useState([]);
+  const [activities, setActivities] = useState([]);
+  const [activitiesLoading, setActivitiesLoading] = useState(true);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    setActivitiesLoading(true);
     API.get('/visitors')
-      .then((res) => setVisitors(res.data))
+      .then((res) => {
+        setVisitors(res.data);
+        // Map visitor logs to activity items
+        const mappedActivities = res.data.slice(0, 5).map((v) => ({
+          _id: v._id,
+          actor: v.visitorName,
+          action: `Visitor log entry for Flat ${v.flatToVisit}. Purpose: ${v.purpose || 'Visit'}.`,
+          timestamp: v.updatedAt || v.createdAt,
+          status: v.approvalStatus?.replace('_', ' '),
+          priority: v.approvalStatus === 'pending' ? 'important' : 'normal'
+        }));
+        setActivities(mappedActivities);
+      })
       .catch((err) => console.error('Failed to load security dashboard visitors', err))
-      .finally(() => setLoading(false));
+      .finally(() => {
+        setLoading(false);
+        setActivitiesLoading(false);
+      });
   }, []);
+
+  if (loading) {
+    return (
+      <DashboardPage>
+        <div className="page-skeleton">
+          <div className="skeleton-box" style={{ height: 110, borderRadius: 'var(--radius)' }} />
+          <DashboardKpiSkeleton count={4} />
+          <DashboardCardSkeleton rows={4} />
+          <DashboardCardSkeleton rows={3} />
+        </div>
+      </DashboardPage>
+    );
+  }
 
   const pending = visitors.filter((visitor) => visitor.approvalStatus === 'pending').length;
   const approved = visitors.filter((visitor) => visitor.approvalStatus === 'approved').length;
@@ -90,26 +124,15 @@ const SecurityDashboard = () => {
         description="Latest visitor movement and gate status."
         icon={Clock}
       >
-        {recentVisitors.length === 0 ? (
-          <DashboardEmptyState title="No visitor records" message="Visitor activity will appear once gate entries are logged." />
-        ) : (
-          <DashboardCard>
-            <h4>Recent Visitor Records</h4>
-            <ul className="dashboard-list">
-              {recentVisitors.map((visitor) => (
-                <li key={visitor._id} className="dashboard-list-item">
-                  <div>
-                    <strong>{visitor.visitorName}</strong>
-                    <span>Flat {visitor.flatToVisit} | {visitor.purpose || 'Visit'}</span>
-                  </div>
-                  <DashboardStatusBadge tone={visitor.approvalStatus === 'pending' ? 'warning' : 'neutral'} icon={visitor.approvalStatus === 'pending' ? Clock : CheckCircle2}>
-                    {visitor.approvalStatus?.replace('_', ' ')}
-                  </DashboardStatusBadge>
-                </li>
-              ))}
-            </ul>
-          </DashboardCard>
-        )}
+        <DashboardCard>
+          <h4>Visitor & Gate Timeline</h4>
+          <ActivityFeed
+            activities={activities}
+            loading={activitiesLoading}
+            emptyTitle="No visitor records logged"
+            emptyMessage="Visitor entries and check-in updates will be tracked here in real-time."
+          />
+        </DashboardCard>
       </DashboardSection>
 
       <DashboardSection

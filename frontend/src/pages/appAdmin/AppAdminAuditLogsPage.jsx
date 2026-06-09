@@ -1,10 +1,15 @@
 import { useState, useEffect } from 'react';
 import API from '../../api/axios';
+import { Search, ShieldAlert } from 'lucide-react';
+import Pagination from '../../components/common/Pagination';
+import EmptyState from '../../components/common/EmptyState';
 
 const AppAdminAuditLogsPage = () => {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   useEffect(() => {
     API.get('/app-admin/audit-logs')
@@ -13,80 +18,109 @@ const AppAdminAuditLogsPage = () => {
       .finally(() => setLoading(false));
   }, []);
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, itemsPerPage]);
+
   const filteredLogs = logs.filter((log) => {
     const term = search.toLowerCase();
     return (
-      log.action.toLowerCase().includes(term) ||
-      log.details.toLowerCase().includes(term) ||
-      (log.performedBy?.name && log.performedBy.name.toLowerCase().includes(term)) ||
-      (log.societyId?.name && log.societyId.name.toLowerCase().includes(term))
+      log.action?.toLowerCase().includes(term) ||
+      log.details?.toLowerCase().includes(term) ||
+      log.performedBy?.name?.toLowerCase().includes(term) ||
+      log.societyId?.name?.toLowerCase().includes(term)
     );
   });
 
-  if (loading) return <p className="page-container">Loading audit logs...</p>;
+  const totalItems = filteredLogs.length;
+  const totalPages = Math.ceil(totalItems / itemsPerPage);
+  const paginatedLogs = filteredLogs.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
 
   return (
-    <section className="page-container">
+    <div className="page-container">
       <h2>System Audit Logs</h2>
       <p className="note">Searchable log of actions performed by administrators across the platform.</p>
 
-      <div style={{ marginBottom: '16px' }}>
-        <input
-          placeholder="Search by action, details, society, admin..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          style={{ padding: '10px', width: '100%', maxWidth: '400px', marginBottom: '0' }}
-        />
+      {/* Search & Filters */}
+      <div className="modern-filter-bar" style={{ marginTop: '16px', marginBottom: '16px' }}>
+        <div className="modern-filter-search-wrap">
+          <Search className="modern-filter-search-icon" size={16} />
+          <input
+            type="text"
+            className="modern-filter-search-input"
+            placeholder="Search by action, details, society, admin..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        {search && (
+          <button
+            type="button"
+            className="btn btn-secondary modern-filter-btn-clear"
+            onClick={() => setSearch('')}
+          >
+            Clear
+          </button>
+        )}
       </div>
 
-      <table className="data-table">
-        <thead>
-          <tr>
-            <th>Timestamp</th>
-            <th>Society</th>
-            <th>Action</th>
-            <th>Performed By</th>
-            <th>Details</th>
-          </tr>
-        </thead>
-        <tbody>
-          {filteredLogs.length === 0 ? (
-            <tr>
-              <td colSpan="5" style={{ textAlign: 'center' }} className="note">
-                No audit logs found.
-              </td>
-            </tr>
-          ) : (
-            filteredLogs.map((log) => (
-              <tr key={log._id}>
-                <td>{new Date(log.createdAt).toLocaleString()}</td>
-                <td>{log.societyId?.name || 'Platform-Wide'}</td>
-                <td>
-                  <span
-                    style={{
-                      background: '#eef6fa',
-                      color: '#1a3c5e',
-                      padding: '2px 6px',
-                      borderRadius: '4px',
-                      fontFamily: 'monospace',
-                      fontSize: '0.85rem',
-                      fontWeight: '600',
-                    }}
-                  >
-                    {log.action}
-                  </span>
-                </td>
-                <td>
-                  <strong>{log.performedBy?.name}</strong> <br />
-                  <span style={{ fontSize: '0.75rem', color: '#666' }}>({log.performedBy?.role})</span>
-                </td>
-                <td style={{ fontSize: '0.9rem', color: '#333' }}>{log.details}</td>
-              </tr>
-            ))
-          )}
-        </tbody>
-      </table>
-    </section>
+      {loading && logs.length === 0 ? (
+        <div className="skeleton card-skeleton" />
+      ) : paginatedLogs.length > 0 ? (
+        <div className="card">
+          <div className="modern-table-wrapper">
+            <table className="modern-table">
+              <thead>
+                <tr>
+                  <th>Timestamp</th>
+                  <th>Society</th>
+                  <th>Action</th>
+                  <th>Performed By</th>
+                  <th>Details</th>
+                </tr>
+              </thead>
+              <tbody>
+                {paginatedLogs.map((log) => (
+                  <tr key={log._id}>
+                    <td>{new Date(log.createdAt).toLocaleString()}</td>
+                    <td>{log.societyId?.name || 'Platform-Wide'}</td>
+                    <td>
+                      <span className="status-pill info" style={{ fontFamily: 'monospace' }}>
+                        {log.action}
+                      </span>
+                    </td>
+                    <td>
+                      <strong>{log.performedBy?.name}</strong> <br />
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>({log.performedBy?.role})</span>
+                    </td>
+                    <td style={{ fontSize: '0.9rem', color: 'var(--text-primary)' }}>{log.details}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            itemsPerPage={itemsPerPage}
+            onPageChange={setCurrentPage}
+            onItemsPerPageChange={setItemsPerPage}
+          />
+        </div>
+      ) : (
+        <EmptyState
+          icon={ShieldAlert}
+          title="No audit logs found"
+          description={search ? "Try adjusting your search query." : "No platform audit logs registered yet."}
+          actionText={search ? "Clear Search" : null}
+          onAction={() => setSearch('')}
+        />
+      )}
+    </div>
   );
 };
 

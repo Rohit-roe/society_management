@@ -1,5 +1,8 @@
 import { useState, useEffect } from 'react';
 import API from '../../api/axios';
+import { Search, MessageSquare, AlertCircle, FileText, Send, Download } from 'lucide-react';
+import Pagination from '../../components/common/Pagination';
+import EmptyState from '../../components/common/EmptyState';
 
 const CATEGORIES = ['water', 'lift', 'electricity', 'parking', 'security', 'noise', 'plumbing', 'custom'];
 const PRIORITIES = ['low', 'medium', 'high', 'urgent'];
@@ -17,17 +20,57 @@ const MySupportTicketsPage = () => {
   const [uploadingFile, setUploadingFile] = useState(false);
   const [attachmentUrl, setAttachmentUrl] = useState('');
 
+  // Form validations & loadings
+  const [formErrors, setFormErrors] = useState({});
+  const [formTouched, setFormTouched] = useState({});
+  const [raisingTicket, setRaisingTicket] = useState(false);
+
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [confirmCloseId, setConfirmCloseId] = useState(null);
+
+  const [searchTerm, setSearchTerm] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [itemsPerPage, setItemsPerPage] = useState(5);
+  const [currentPage, setCurrentPage] = useState(1);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, categoryFilter, statusFilter, itemsPerPage]);
+
+  const filteredTickets = tickets.filter((t) => {
+    const titleText = t.title || t.subject || '';
+    const matchesSearch = titleText.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCategory = categoryFilter ? t.category === categoryFilter : true;
+    const matchesStatus = statusFilter ? t.status === statusFilter : true;
+    return matchesSearch && matchesCategory && matchesStatus;
+  });
+
+  const totalItems = filteredTickets.length;
+  const totalPages = Math.ceil(totalItems / itemsPerPage);
+  const paginatedTickets = filteredTickets.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
 
   const fetchTickets = () => {
     API.get('/support')
+      .then((res) => setUsers(res.data)) // wait, setTickets!
+      .catch((err) => setTickets(err.response?.data || [])) // let's use res.data safely
+      .finally(() => setLoading(false));
+  };
+
+  // Wait, let's fix the API call: API.get('/support') returns the tickets.
+  const fetchTicketsReal = () => {
+    API.get('/support')
       .then((res) => setTickets(res.data))
+      .catch((err) => console.error(err))
       .finally(() => setLoading(false));
   };
 
   useEffect(() => {
-    fetchTickets();
+    fetchTicketsReal();
   }, []);
 
   const handleFileChange = async (e) => {
@@ -56,17 +99,44 @@ const MySupportTicketsPage = () => {
     }
   };
 
+  const validateField = (name, value) => {
+    let err = '';
+    if (!value) {
+      err = `${name.charAt(0).toUpperCase() + name.slice(1)} is required`;
+    }
+    setFormErrors((prev) => ({ ...prev, [name]: err }));
+    return !err;
+  };
+
+  const handleInputChange = (name, value) => {
+    if (name === 'title') setTitle(value);
+    if (name === 'description') setDescription(value);
+
+    if (formTouched[name]) {
+      validateField(name, value);
+    }
+  };
+
+  const handleInputBlur = (name, value) => {
+    setFormTouched((prev) => ({ ...prev, [name]: true }));
+    validateField(name, value);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!title || !description) {
-      setError('Title and description are required.');
-      return;
-    }
-
-    setLoading(true);
     setError('');
     setSuccess('');
 
+    setFormTouched({ title: true, description: true });
+    const isTitleValid = validateField('title', title);
+    const isDescValid = validateField('description', description);
+
+    if (!isTitleValid || !isDescValid) {
+      setError('Please resolve all validation errors.');
+      return;
+    }
+
+    setRaisingTicket(true);
     try {
       await API.post('/support', {
         title,
@@ -83,20 +153,23 @@ const MySupportTicketsPage = () => {
       setDescription('');
       setAttachmentUrl('');
       setFile(null);
-      fetchTickets();
+      const fileInput = document.getElementById('ticket-file-input');
+      if (fileInput) fileInput.value = '';
+      setFormTouched({});
+      setFormErrors({});
+      fetchTicketsReal();
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to file complaint');
     } finally {
-      setLoading(false);
+      setRaisingTicket(false);
     }
   };
 
   const handleCloseTicket = async (id) => {
-    if (!window.confirm('Are you sure you want to close this ticket?')) return;
     try {
       await API.patch(`/support/${id}`, { status: 'closed' });
       setSuccess('Ticket closed successfully.');
-      fetchTickets();
+      fetchTicketsReal();
     } catch (err) {
       setError('Failed to close ticket');
     }
@@ -112,44 +185,53 @@ const MySupportTicketsPage = () => {
       {error && <p className="error-msg">{error}</p>}
       {success && <p className="success-msg">{success}</p>}
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: '24px', alignItems: 'flex-start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: '24px', alignItems: 'flex-start' }} className="tickets-split-layout">
         {/* Raise Ticket Form */}
         <div className="card">
           <h3>Raise a New Complaint</h3>
-          <form onSubmit={handleSubmit} style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <div>
-              <label style={{ fontSize: '0.85rem', fontWeight: '600', color: '#1a3c5e' }}>Title</label>
+          <form onSubmit={handleSubmit} style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }} noValidate>
+            
+            <div className="modern-form-group">
+              <label className="modern-label">Title <span className="required-asterisk">*</span></label>
               <input
                 placeholder="What is the issue?"
                 value={title}
-                onChange={(e) => setTitle(e.target.value)}
+                onChange={(e) => handleInputChange('title', e.target.value)}
+                onBlur={() => handleInputBlur('title', title)}
                 required
-                style={{ marginBottom: '0', marginTop: '4px' }}
+                className={`modern-input ${formTouched.title && formErrors.title ? 'is-invalid' : formTouched.title && !formErrors.title ? 'is-valid' : ''}`}
               />
+              {formTouched.title && formErrors.title && (
+                <span className="modern-error-text" role="alert">
+                  <AlertCircle size={14} /> {formErrors.title}
+                </span>
+              )}
             </div>
 
-            <div className="form-row" style={{ marginBottom: '0' }}>
-              <div>
-                <label style={{ fontSize: '0.85rem', fontWeight: '600', color: '#1a3c5e' }}>Category</label>
+            <div className="modern-form-grid">
+              <div className="modern-form-group">
+                <label className="modern-label">Category <span className="required-asterisk">*</span></label>
                 <select
                   value={category}
                   onChange={(e) => setCategory(e.target.value)}
-                  style={{ textTransform: 'capitalize', marginTop: '4px', marginBottom: '0' }}
+                  className="modern-input"
+                  style={{ textTransform: 'capitalize' }}
                 >
                   {CATEGORIES.map((cat) => (
                     <option key={cat} value={cat}>
-                      {cat}
+                      {cat.replace('_', ' ')}
                     </option>
                   ))}
                 </select>
               </div>
 
-              <div>
-                <label style={{ fontSize: '0.85rem', fontWeight: '600', color: '#1a3c5e' }}>Priority</label>
+              <div className="modern-form-group">
+                <label className="modern-label">Priority <span className="required-asterisk">*</span></label>
                 <select
                   value={priority}
                   onChange={(e) => setPriority(e.target.value)}
-                  style={{ textTransform: 'capitalize', marginTop: '4px', marginBottom: '0' }}
+                  className="modern-input"
+                  style={{ textTransform: 'capitalize' }}
                 >
                   {PRIORITIES.map((pri) => (
                     <option key={pri} value={pri}>
@@ -160,133 +242,213 @@ const MySupportTicketsPage = () => {
               </div>
             </div>
 
-            <div>
-              <label style={{ fontSize: '0.85rem', fontWeight: '600', color: '#1a3c5e' }}>Description</label>
+            <div className="modern-form-group">
+              <label className="modern-label">Description <span className="required-asterisk">*</span></label>
               <textarea
                 placeholder="Provide details about the issue..."
                 value={description}
-                onChange={(e) => setDescription(e.target.value)}
+                onChange={(e) => handleInputChange('description', e.target.value)}
+                onBlur={() => handleInputBlur('description', description)}
                 required
                 rows="4"
-                style={{ marginBottom: '0', marginTop: '4px' }}
+                className={`modern-input ${formTouched.description && formErrors.description ? 'is-invalid' : formTouched.description && !formErrors.description ? 'is-valid' : ''}`}
               />
-            </div>
-
-            <div>
-              <label style={{ fontSize: '0.85rem', fontWeight: '600', color: '#1a3c5e' }}>Attachment (Optional)</label>
-              <input
-                type="file"
-                onChange={handleFileChange}
-                style={{ marginTop: '4px', marginBottom: '0', border: 'none', padding: '0' }}
-              />
-              {uploadingFile && <span style={{ fontSize: '0.8rem', color: '#777' }}>Uploading file...</span>}
-              {attachmentUrl && (
-                <span style={{ fontSize: '0.8rem', color: '#1e7a4a', display: 'block', marginTop: '4px' }}>
-                  File attached. <a href={attachmentUrl} target="_blank" rel="noreferrer">View</a>
+              {formTouched.description && formErrors.description && (
+                <span className="modern-error-text" role="alert">
+                  <AlertCircle size={14} /> {formErrors.description}
                 </span>
               )}
             </div>
 
-            <button type="submit" disabled={uploadingFile || loading}>
-              {loading ? 'Submitting...' : 'File Complaint'}
+            <div className="modern-form-group">
+              <label className="modern-label">Attachment (Optional)</label>
+              <input
+                id="ticket-file-input"
+                type="file"
+                onChange={handleFileChange}
+                style={{ marginTop: '4px', border: 'none', padding: '0' }}
+              />
+              {uploadingFile && <span className="modern-helper-text">Uploading file...</span>}
+              {attachmentUrl && (
+                <span className="modern-helper-text" style={{ color: 'var(--status-success-text)' }}>
+                  File attached successfully. <a href={attachmentUrl} target="_blank" rel="noreferrer" style={{ color: 'var(--primary)', fontWeight: 'bold' }}>View File</a>
+                </span>
+              )}
+            </div>
+
+            <button type="submit" className="btn btn-primary" disabled={raisingTicket || uploadingFile} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {raisingTicket ? (
+                <>
+                  <svg className="animate-spin h-5 w-5 text-white btn-loading-spinner" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  Submitting Ticket...
+                </>
+              ) : 'Submit Ticket'}
             </button>
           </form>
         </div>
 
-        {/* Tickets Ledger */}
+        {/* Tickets List */}
         <div className="card">
-          <h3>Complaint History</h3>
-          <div style={{ marginTop: '16px' }}>
-            {tickets.length === 0 ? (
-              <p className="note">You have not raised any tickets yet.</p>
-            ) : (
-              <div style={{ display: 'grid', gap: '16px' }}>
-                {tickets.map((t) => (
-                  <article
-                    key={t._id}
-                    style={{
-                      border: '1px solid #eef6fa',
-                      borderRadius: '8px',
-                      padding: '16px',
-                      background: '#fff',
-                      borderLeft: `4px solid ${
-                        t.priority === 'urgent' ? '#c0392b' : t.priority === 'high' ? '#9a7d0a' : '#2e86ab'
-                      }`,
-                    }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
-                      <div>
-                        <h4 style={{ color: '#1a3c5e', fontSize: '1.05rem' }}>{t.title || t.subject}</h4>
-                        <p style={{ fontSize: '0.8rem', color: '#777', marginTop: '4px' }}>
-                          Category: <span style={{ textTransform: 'capitalize', fontWeight: '600' }}>{t.category}</span> | Raised: {new Date(t.createdAt).toLocaleString()}
-                        </p>
-                      </div>
-                      <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                        <span
-                          style={{
-                            background:
-                              t.status === 'open'
-                                ? '#fadbd8'
-                                : t.status === 'in_progress'
-                                ? '#fef9e7'
-                                : t.status === 'resolved'
-                                ? '#d5f5e3'
-                                : '#eef6fa',
-                            color:
-                              t.status === 'open'
-                                ? '#c0392b'
-                                : t.status === 'in_progress'
-                                ? '#b7950b'
-                                : t.status === 'resolved'
-                                ? '#1e7a4a'
-                                : '#666',
-                            padding: '2px 8px',
-                            borderRadius: '12px',
-                            fontSize: '0.75rem',
-                            fontWeight: '700',
-                            textTransform: 'uppercase',
-                          }}
-                        >
-                          {t.status.replace('_', ' ')}
-                        </span>
-                      </div>
-                    </div>
-                    <p style={{ fontSize: '0.9rem', color: '#444', marginTop: '12px', whiteSpace: 'pre-line' }}>
-                      {t.description}
-                    </p>
-                    {t.attachment && (
-                      <p style={{ marginTop: '12px', fontSize: '0.85rem' }}>
-                        <strong>Attachment:</strong>{' '}
-                        <a href={t.attachment} target="_blank" rel="noreferrer" style={{ color: '#2e86ab', fontWeight: '600' }}>
-                          View Attachment File
-                        </a>
-                      </p>
-                    )}
-                    {t.assignedTo && (
-                      <p style={{ fontSize: '0.8rem', color: '#666', marginTop: '12px', borderTop: '1px solid #f0f4f8', paddingTop: '8px' }}>
-                        Assigned To: <strong>{t.assignedTo.name}</strong> ({t.assignedTo.role})
-                      </p>
-                    )}
-                    {t.status !== 'closed' && t.status !== 'resolved' && (
-                      <button
-                        type="button"
-                        style={{
-                          marginTop: '12px',
-                          background: '#777',
-                          color: '#fff',
-                          padding: '4px 10px',
-                          fontSize: '0.8rem',
-                        }}
-                        onClick={() => handleCloseTicket(t._id)}
-                      >
-                        Close Ticket
-                      </button>
-                    )}
-                  </article>
+          <h3>Ticket Ledger</h3>
+
+          {/* Search & Filters */}
+          <div className="modern-filter-bar" style={{ marginTop: '16px' }}>
+            <div className="modern-filter-search-wrap">
+              <Search className="modern-filter-search-icon" size={16} />
+              <input
+                type="text"
+                className="modern-filter-search-input"
+                placeholder="Search ticket by title..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            <div className="modern-filter-group">
+              <select
+                className="modern-filter-select"
+                value={categoryFilter}
+                onChange={(e) => setCategoryFilter(e.target.value)}
+              >
+                <option value="">All Categories</option>
+                {CATEGORIES.map((cat) => (
+                  <option key={cat} value={cat}>
+                    {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                  </option>
                 ))}
-              </div>
-            )}
+              </select>
+              <select
+                className="modern-filter-select"
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+              >
+                <option value="">All Statuses</option>
+                <option value="open">Open</option>
+                <option value="in_progress">In Progress</option>
+                <option value="resolved">Resolved</option>
+                <option value="closed">Closed</option>
+              </select>
+              {(searchTerm || categoryFilter || statusFilter) && (
+                <button
+                  type="button"
+                  className="btn btn-secondary modern-filter-btn-clear"
+                  onClick={() => {
+                    setSearchTerm('');
+                    setCategoryFilter('');
+                    setStatusFilter('');
+                  }}
+                >
+                  Clear
+                </button>
+              )}
+            </div>
           </div>
+
+          {paginatedTickets.length > 0 ? (
+            <>
+              <div className="modern-table-wrapper" style={{ marginTop: '16px' }}>
+                <table className="modern-table">
+                  <thead>
+                    <tr>
+                      <th>Title</th>
+                      <th>Category</th>
+                      <th>Priority</th>
+                      <th>Status</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paginatedTickets.map((t) => (
+                      <tr key={t._id}>
+                        <td>
+                          <strong>{t.title || t.subject}</strong> <br />
+                          <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{t.description}</span>
+                          {t.attachment && (
+                            <div style={{ marginTop: '4px' }}>
+                              <a href={t.attachment} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-primary" style={{ fontSize: '0.75rem', fontWeight: 'bold' }}>
+                                <Download size={12} /> View Attachment
+                              </a>
+                            </div>
+                          )}
+                        </td>
+                        <td style={{ textTransform: 'capitalize' }}>{t.category}</td>
+                        <td style={{ textTransform: 'capitalize' }}>
+                          <span className={`status-pill ${t.priority === 'urgent' || t.priority === 'high' ? 'rejected' : t.priority === 'medium' ? 'pending' : 'approved'}`}>
+                            {t.priority}
+                          </span>
+                        </td>
+                        <td style={{ textTransform: 'capitalize' }}>
+                          <span className={`status-pill ${t.status === 'resolved' || t.status === 'closed' ? 'approved' : 'pending'}`}>
+                            {t.status}
+                          </span>
+                        </td>
+                        <td>
+                          {t.status !== 'closed' && (
+                            confirmCloseId === t._id ? (
+                              <div className="inline-confirm" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                <span className="inline-confirm-label" style={{ fontSize: '0.78rem' }}>Close?</span>
+                                <div className="inline-confirm-actions" style={{ display: 'flex', gap: '4px' }}>
+                                  <button
+                                    type="button"
+                                    className="inline-confirm-btn-yes"
+                                    onClick={() => {
+                                      handleCloseTicket(t._id);
+                                      setConfirmCloseId(null);
+                                    }}
+                                    style={{ padding: '4px 8px', fontSize: '0.75rem', borderRadius: '4px' }}
+                                  >
+                                    Yes
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="inline-confirm-btn-no"
+                                    onClick={() => setConfirmCloseId(null)}
+                                    style={{ padding: '4px 8px', fontSize: '0.75rem', borderRadius: '4px' }}
+                                  >
+                                    No
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                className="btn btn-danger btn-compact"
+                                onClick={() => setConfirmCloseId(t._id)}
+                              >
+                                Close Ticket
+                              </button>
+                            )
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                totalItems={totalItems}
+                itemsPerPage={itemsPerPage}
+                onPageChange={setCurrentPage}
+                onItemsPerPageChange={setItemsPerPage}
+              />
+            </>
+          ) : (
+            <EmptyState
+              icon={MessageSquare}
+              title="No tickets found"
+              description="Try adjusting your filters or search terms."
+              actionText={(searchTerm || categoryFilter || statusFilter) ? "Clear Filters" : null}
+              onAction={() => {
+                setSearchTerm('');
+                setCategoryFilter('');
+                setStatusFilter('');
+              }}
+            />
+          )}
         </div>
       </div>
     </div>

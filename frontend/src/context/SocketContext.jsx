@@ -4,7 +4,18 @@ import { useAuth } from './AuthContext';
 
 const SocketContext = createContext(null);
 
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000';
+const getNormalizedSocketUrl = () => {
+  let url = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000';
+  if (url && !/^https?:\/\//i.test(url) && !url.startsWith('/')) {
+    if (url.startsWith('localhost') || url.startsWith('127.0.0.1')) {
+      return `http://${url}`;
+    }
+    return `https://${url}`;
+  }
+  return url;
+};
+
+const SOCKET_URL = getNormalizedSocketUrl();
 
 export const SocketProvider = ({ children }) => {
   const { user } = useAuth();

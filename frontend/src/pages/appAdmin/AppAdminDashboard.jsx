@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   BarChart,
   Bar,
@@ -9,16 +9,20 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts';
-import { BarChart3, Building2, Calendar, FileText, ListChecks, MessageSquare, Plus, Siren, Users, Vote, Wallet } from 'lucide-react';
+import { BarChart3, Building2, Calendar, FileText, ListChecks, MessageSquare, Plus, Siren, Users, Vote, Wallet, X } from 'lucide-react';
 import API from '../../api/axios';
+import ActivityFeed from '../../components/common/ActivityFeed';
+import toast from 'react-hot-toast';
 import {
   DashboardActionGrid,
   DashboardActionLink,
   DashboardCard,
+  DashboardCardSkeleton,
   DashboardEmptyState,
   DashboardHeader,
   DashboardKpiCard,
   DashboardKpiGrid,
+  DashboardKpiSkeleton,
   DashboardPage,
   DashboardSection,
   DashboardStatusBadge,
@@ -29,25 +33,48 @@ const formatCurrency = (value = 0) => `Rs. ${Number(value || 0).toLocaleString()
 const AppAdminDashboard = () => {
   const [stats, setStats] = useState(null);
   const [requests, setRequests] = useState([]);
+  const [activities, setActivities] = useState([]);
+  const [activitiesLoading, setActivitiesLoading] = useState(true);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-  const [rejectionId, setRejectionId] = useState('');
+
+  // Modal States
+  const [confirmApproveRequest, setConfirmApproveRequest] = useState(null);
+  const [rejectionRequest, setRejectionRequest] = useState(null);
   const [rejectionReason, setRejectionReason] = useState('');
+
+  // Refs for Focus Trap
+  const approveConfirmButtonRef = useRef(null);
+  const rejectTextareaRef = useRef(null);
 
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      const [summaryRes, requestsRes] = await Promise.all([
+      setActivitiesLoading(true);
+      const [summaryRes, requestsRes, auditRes] = await Promise.all([
         API.get('/app-admin/summary'),
         API.get('/app-admin/requests'),
+        API.get('/app-admin/audit-logs').catch(() => ({ data: [] })),
       ]);
       setStats(summaryRes.data);
       setRequests(requestsRes.data);
-      setError('');
+
+      const mappedActivities = auditRes.data.slice(0, 5).map((log) => ({
+        _id: log._id,
+        actor: log.performedBy?.name || 'System Admin',
+        action: `${log.action} ${log.societyId?.name ? `(${log.societyId.name})` : ''}: ${log.details}`,
+        timestamp: log.createdAt,
+        status: 'logged',
+        priority: (log.action?.includes('REJECT') || log.action?.includes('DELETE'))
+          ? 'critical'
+          : (log.action?.includes('APPROVE') || log.action?.includes('CREATE'))
+            ? 'important'
+            : 'normal'
+      }));
+      setActivities(mappedActivities);
+      setActivitiesLoading(false);
     } catch (err) {
       console.error(err);
-      setError('Failed to fetch admin dashboard data');
+      toast.error('Failed to fetch admin dashboard data');
     } finally {
       setLoading(false);
     }
@@ -57,16 +84,42 @@ const AppAdminDashboard = () => {
     fetchDashboardData();
   }, []);
 
+  // ESC Key listener for Modals
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setConfirmApproveRequest(null);
+        setRejectionRequest(null);
+      }
+    };
+    if (confirmApproveRequest || rejectionRequest) {
+      window.addEventListener('keydown', handleKeyDown);
+    }
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [confirmApproveRequest, rejectionRequest]);
+
+  // Focus trap for Approval Confirm button
+  useEffect(() => {
+    if (confirmApproveRequest) {
+      approveConfirmButtonRef.current?.focus();
+    }
+  }, [confirmApproveRequest]);
+
+  // Focus trap for Rejection textarea
+  useEffect(() => {
+    if (rejectionRequest) {
+      rejectTextareaRef.current?.focus();
+    }
+  }, [rejectionRequest]);
+
   const handleApprove = async (id) => {
-    if (!window.confirm('Are you sure you want to approve this society? This will create the society and activate the admin user.')) return;
     try {
-      setError('');
-      setSuccess('');
       const res = await API.post(`/app-admin/requests/${id}/approve`);
-      setSuccess(res.data.message);
+      toast.success(res.data.message || 'Society approved successfully');
+      setConfirmApproveRequest(null);
       fetchDashboardData();
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to approve society');
+      toast.error(err.response?.data?.message || 'Failed to approve society');
     }
   };
 
@@ -74,19 +127,28 @@ const AppAdminDashboard = () => {
     e.preventDefault();
     if (!rejectionReason.trim()) return;
     try {
-      setError('');
-      setSuccess('');
       const res = await API.post(`/app-admin/requests/${id}/reject`, { rejectionReason });
-      setSuccess(res.data.message);
-      setRejectionId('');
+      toast.success(res.data.message || 'Society onboarding rejected');
+      setRejectionRequest(null);
       setRejectionReason('');
       fetchDashboardData();
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to reject society');
+      toast.error(err.response?.data?.message || 'Failed to reject society');
     }
   };
 
-  if (loading) return <p className="page-container">Loading admin dashboard...</p>;
+  if (loading) {
+    return (
+      <DashboardPage>
+        <div className="page-skeleton">
+          <div className="skeleton-box" style={{ height: 110, borderRadius: 'var(--radius)' }} />
+          <DashboardKpiSkeleton count={8} />
+          <DashboardCardSkeleton rows={4} />
+          <DashboardCardSkeleton rows={3} />
+        </div>
+      </DashboardPage>
+    );
+  }
 
   const pendingRequests = requests.filter((request) => request.status === 'pending');
 
@@ -103,11 +165,8 @@ const AppAdminDashboard = () => {
         }
       />
 
-      {error && <p className="error-msg">{error}</p>}
-      {success && <p className="success-msg">{success}</p>}
-
       {stats && (
-        <DashboardKpiGrid>
+        <DashboardKpiGrid className="dashboard-kpi-grid--fluid">
           <DashboardKpiCard icon={Building2} label="Total Societies" value={stats.societyCount} helper="Registered societies" />
           <DashboardKpiCard icon={Users} label="Platform Users" value={stats.userCount} helper="All user accounts" />
           <DashboardKpiCard icon={MessageSquare} label="Active Complaints" value={stats.activeComplaints} helper="Cross-society support load" tone={stats.activeComplaints ? 'warning' : 'default'} />
@@ -153,40 +212,24 @@ const AppAdminDashboard = () => {
                 </div>
 
                 <div className="dashboard-inline-actions">
-                  <button type="button" className="btn btn-primary" onClick={() => handleApprove(request._id)}>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={() => setConfirmApproveRequest(request)}
+                  >
                     Approve Society
                   </button>
-                  <button type="button" className="btn btn-danger" onClick={() => setRejectionId(request._id)}>
+                  <button
+                    type="button"
+                    className="btn btn-danger"
+                    onClick={() => {
+                      setRejectionRequest(request);
+                      setRejectionReason('');
+                    }}
+                  >
                     Reject
                   </button>
                 </div>
-
-                {rejectionId === request._id && (
-                  <form onSubmit={(e) => handleRejectSubmit(e, request._id)} className="dashboard-reject-form">
-                    <label>Rejection Reason</label>
-                    <input
-                      placeholder="Provide rejection reason..."
-                      value={rejectionReason}
-                      onChange={(e) => setRejectionReason(e.target.value)}
-                      required
-                    />
-                    <div className="dashboard-inline-actions">
-                      <button type="submit" className="btn btn-danger">
-                        Confirm Rejection
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-secondary"
-                        onClick={() => {
-                          setRejectionId('');
-                          setRejectionReason('');
-                        }}
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </form>
-                )}
               </DashboardCard>
             ))}
           </div>
@@ -195,35 +238,47 @@ const AppAdminDashboard = () => {
 
       <DashboardSection
         title="Recent Activity"
-        description="Platform-wide financial risk and defaulting society trends."
+        description="Platform-wide administration log and financial trends."
         icon={BarChart3}
       >
-        {stats?.highDefaulterSocieties?.length > 0 ? (
+        <div className="dashboard-two-column">
+          <DashboardCard>
+            <h4>Platform Activity Feed</h4>
+            <ActivityFeed
+              activities={activities}
+              loading={activitiesLoading}
+              emptyTitle="No platform events logged"
+              emptyMessage="Global society additions, account approvals, and superadmin updates will appear here."
+            />
+          </DashboardCard>
+
           <DashboardCard>
             <h4>Top Defaulting Societies</h4>
-            <div className="dashboard-chart-wrap">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={stats.highDefaulterSocieties}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                  <XAxis dataKey="societyName" stroke="var(--text-secondary)" />
-                  <YAxis stroke="var(--text-secondary)" />
-                  <Tooltip
-                    formatter={(value) => formatCurrency(value)}
-                    contentStyle={{
-                      background: 'var(--bg-card)',
-                      border: '1px solid var(--border)',
-                      color: 'var(--text-primary)',
-                    }}
-                  />
-                  <Legend />
-                  <Bar dataKey="unpaidAmount" fill="var(--primary)" name="Unpaid Dues" />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+            {stats?.highDefaulterSocieties?.length > 0 ? (
+              <div className="dashboard-chart-wrap" style={{ minHeight: '300px' }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={stats.highDefaulterSocieties}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                    <XAxis dataKey="societyName" stroke="var(--text-secondary)" />
+                    <YAxis stroke="var(--text-secondary)" />
+                    <Tooltip
+                      formatter={(value) => formatCurrency(value)}
+                      contentStyle={{
+                        background: 'var(--bg-card)',
+                        border: '1px solid var(--border)',
+                        color: 'var(--text-primary)',
+                      }}
+                    />
+                    <Legend />
+                    <Bar dataKey="unpaidAmount" fill="var(--primary)" name="Unpaid Dues" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <DashboardEmptyState title="No defaulting society chart" message="Outstanding dues trends will appear when available." />
+            )}
           </DashboardCard>
-        ) : (
-          <DashboardEmptyState title="No defaulting society chart" message="Outstanding dues trends will appear when available." />
-        )}
+        </div>
       </DashboardSection>
 
       <DashboardSection
@@ -259,6 +314,98 @@ const AppAdminDashboard = () => {
           </DashboardCard>
         </div>
       </DashboardSection>
+
+      {/* In-Page Confirmation Modal for Approval */}
+      {confirmApproveRequest && (
+        <div className="modal-overlay" role="dialog" aria-modal="true">
+          <div className="modal-content">
+            <div className="modal-header">
+              <h3 className="modal-title">Approve Society</h3>
+              <button
+                type="button"
+                className="modal-close"
+                onClick={() => setConfirmApproveRequest(null)}
+                aria-label="Close modal"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div style={{ margin: '16px 0', fontSize: '0.95rem', color: 'var(--text-primary)' }}>
+              <p>Are you sure you want to approve <strong>{confirmApproveRequest.name}</strong>?</p>
+              <p style={{ marginTop: '8px', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                This will activate the society account and automatically grant administrative credentials.
+              </p>
+            </div>
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '24px' }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setConfirmApproveRequest(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                ref={approveConfirmButtonRef}
+                className="btn btn-primary"
+                onClick={() => handleApprove(confirmApproveRequest._id)}
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Rejection Reason Modal */}
+      {rejectionRequest && (
+        <div className="modal-overlay" role="dialog" aria-modal="true">
+          <div className="modal-content">
+            <div className="modal-header">
+              <h3 className="modal-title">Reject Society Onboarding</h3>
+              <button
+                type="button"
+                className="modal-close"
+                onClick={() => setRejectionRequest(null)}
+                aria-label="Close modal"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <form onSubmit={(e) => handleRejectSubmit(e, rejectionRequest._id)}>
+              <div className="modern-form-group" style={{ margin: '16px 0' }}>
+                <label className="modern-label" style={{ marginBottom: '8px', display: 'block' }}>
+                  Provide Rejection Reason for <strong>{rejectionRequest.name}</strong>
+                </label>
+                <textarea
+                  ref={rejectTextareaRef}
+                  className="modern-input"
+                  style={{ width: '100%', minHeight: '100px', padding: '10px' }}
+                  placeholder="State the reason for rejection (this will be visible to the applicant)..."
+                  value={rejectionReason}
+                  onChange={(e) => setRejectionReason(e.target.value)}
+                  required
+                />
+              </div>
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '24px' }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setRejectionRequest(null)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-danger"
+                >
+                  Confirm Rejection
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </DashboardPage>
   );
 };

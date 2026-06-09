@@ -17,14 +17,17 @@ import {
   Wrench,
 } from 'lucide-react';
 import API from '../../api/axios';
+import ActivityFeed from '../../components/common/ActivityFeed';
 import {
   DashboardActionGrid,
   DashboardActionLink,
   DashboardCard,
+  DashboardCardSkeleton,
   DashboardEmptyState,
   DashboardHeader,
   DashboardKpiCard,
   DashboardKpiGrid,
+  DashboardKpiSkeleton,
   DashboardPage,
   DashboardSection,
   DashboardStatusBadge,
@@ -46,19 +49,23 @@ const AdminDashboard = () => {
   const [wallet, setWallet] = useState(null);
   const [requests, setRequests] = useState([]);
   const [tickets, setTickets] = useState([]);
+  const [activities, setActivities] = useState([]);
+  const [activitiesLoading, setActivitiesLoading] = useState(true);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const loadDashboard = async () => {
       try {
         setLoading(true);
-        const [usersRes, noticesRes, maintenanceRes, walletRes, requestsRes, ticketsRes] = await Promise.all([
+        setActivitiesLoading(true);
+        const [usersRes, noticesRes, maintenanceRes, walletRes, requestsRes, ticketsRes, auditRes] = await Promise.all([
           API.get('/users/society'),
           API.get('/notices'),
           API.get('/maintenance'),
           API.get('/finances/wallet').catch(() => ({ data: null })),
           API.get('/residents/requests').catch(() => ({ data: [] })),
           API.get('/support').catch(() => ({ data: [] })),
+          API.get('/residents/audit-logs').catch(() => ({ data: [] })),
         ]);
         setResidents(usersRes.data);
         setNotices(noticesRes.data);
@@ -66,6 +73,22 @@ const AdminDashboard = () => {
         setWallet(walletRes.data);
         setRequests(requestsRes.data);
         setTickets(ticketsRes.data.filter((t) => t.status === 'open' || t.status === 'in_progress'));
+
+        // Map audit logs to activity items
+        const mappedActivities = auditRes.data.slice(0, 5).map((log) => ({
+          _id: log._id,
+          actor: log.performedBy?.name || 'Admin',
+          action: `${log.action}: ${log.details}`,
+          timestamp: log.createdAt,
+          status: 'logged',
+          priority: (log.action?.includes('DELETE') || log.action?.includes('REJECT') || log.action?.includes('PENALTY'))
+            ? 'critical'
+            : (log.action?.includes('INVITE') || log.action?.includes('APPROVE') || log.action?.includes('CREATE'))
+              ? 'important'
+              : 'normal'
+        }));
+        setActivities(mappedActivities);
+        setActivitiesLoading(false);
       } catch (err) {
         console.error('Error loading dashboard', err);
       } finally {
@@ -75,7 +98,18 @@ const AdminDashboard = () => {
     loadDashboard();
   }, []);
 
-  if (loading) return <p className="page-container">Loading admin control panel...</p>;
+  if (loading) {
+    return (
+      <DashboardPage>
+        <div className="page-skeleton">
+          <div className="skeleton-box" style={{ height: 110, borderRadius: 'var(--radius)' }} />
+          <DashboardKpiSkeleton count={6} />
+          <DashboardCardSkeleton rows={4} />
+          <DashboardCardSkeleton rows={3} />
+        </div>
+      </DashboardPage>
+    );
+  }
 
   const activeResidents = residents.filter((r) => r.role === 'resident' && r.status === 'active').length;
   const pendingDuesCount = maintenance.filter((r) => r.status === 'pending').length;
@@ -99,7 +133,7 @@ const AdminDashboard = () => {
         }
       />
 
-      <DashboardKpiGrid>
+      <DashboardKpiGrid className="dashboard-kpi-grid--fluid">
         <DashboardKpiCard icon={Users} label="Active Residents" value={activeResidents} helper="Approved resident users" />
         <DashboardKpiCard icon={Wrench} label="Pending Dues" value={pendingDuesCount} helper="Maintenance records" tone={pendingDuesCount ? 'warning' : 'default'} />
         <DashboardKpiCard icon={Siren} label="Overdue Dues" value={overdueDuesCount} helper="Needs follow-up" tone={overdueDuesCount ? 'danger' : 'default'} />
@@ -162,10 +196,20 @@ const AdminDashboard = () => {
 
       <DashboardSection
         title="Recent Activity"
-        description="Latest notices and maintenance records."
+        description="Society governance logs and recent notices."
         icon={MessageSquare}
       >
         <div className="dashboard-two-column">
+          <DashboardCard>
+            <h4>Society Activity Feed</h4>
+            <ActivityFeed
+              activities={activities}
+              loading={activitiesLoading}
+              emptyTitle="No recent log events"
+              emptyMessage="Governance actions, member invites, and system notices will be logged here."
+            />
+          </DashboardCard>
+
           <DashboardCard>
             <h4>Recent Notices</h4>
             {recentNotices.length === 0 ? (
@@ -178,25 +222,6 @@ const AdminDashboard = () => {
                       <strong>{notice.title}</strong>
                       <span>{new Date(notice.createdAt).toLocaleDateString()}</span>
                     </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </DashboardCard>
-
-          <DashboardCard>
-            <h4>Maintenance Snapshot</h4>
-            {recentMaintenance.length === 0 ? (
-              <DashboardEmptyState title="No maintenance records" message="Uploaded dues will appear here." />
-            ) : (
-              <ul className="dashboard-list">
-                {recentMaintenance.map((record) => (
-                  <li key={record._id} className="dashboard-list-item">
-                    <div>
-                      <strong>{formatCurrency(record.amount)}</strong>
-                      <span>Flat {record.flatNumber || 'N/A'} | {record.month}/{record.year}</span>
-                    </div>
-                    <DashboardStatusBadge tone={statusTone(record.status)} icon={Wrench}>{record.status}</DashboardStatusBadge>
                   </li>
                 ))}
               </ul>

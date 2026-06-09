@@ -1,18 +1,20 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Bell } from 'lucide-react';
 import { useSocket } from '../../context/SocketContext';
 import API from '../../api/axios';
+import NotificationDrawer from './NotificationDrawer';
 
 const NotificationBell = () => {
   const socket = useSocket();
-  const navigate = useNavigate();
   const [unread, setUnread] = useState(0);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   const loadUnread = () => {
-    API.get('/notifications').then((res) => {
-      setUnread(res.data.filter((n) => !n.isRead).length);
-    });
+    API.get('/notifications')
+      .then((res) => {
+        setUnread(res.data.filter((n) => !n.isRead).length);
+      })
+      .catch((err) => console.error('Error fetching unread count:', err));
   };
 
   useEffect(() => {
@@ -21,22 +23,39 @@ const NotificationBell = () => {
 
   useEffect(() => {
     if (!socket) return undefined;
-    const onNew = () => setUnread((prev) => prev + 1);
+    const onNew = () => {
+      setUnread((prev) => prev + 1);
+    };
     socket.on('new_notification', onNew);
     return () => socket.off('new_notification', onNew);
   }, [socket]);
 
   return (
-    <button
-      type="button"
-      className="notification-bell-btn"
-      onClick={() => navigate('/notifications')}
-      aria-label="Notifications"
-    >
-      <Bell className="nav-icon" aria-hidden="true" />
-      {unread > 0 && <span className="bell-badge">{unread > 9 ? '9+' : unread}</span>}
-    </button>
+    <>
+      <button
+        type="button"
+        className="notification-bell-btn"
+        onClick={() => setIsDrawerOpen(!isDrawerOpen)}
+        aria-label={`Notifications. ${unread} unread.`}
+        aria-expanded={isDrawerOpen}
+        style={{ position: 'relative' }}
+      >
+        <Bell className="nav-icon" aria-hidden="true" />
+        {unread > 0 && (
+          <span className="bell-badge" aria-hidden="true">
+            {unread > 9 ? '9+' : unread}
+          </span>
+        )}
+      </button>
+
+      <NotificationDrawer
+        isOpen={isDrawerOpen}
+        onClose={() => setIsDrawerOpen(false)}
+        onRefreshUnread={loadUnread}
+      />
+    </>
   );
 };
 
 export default NotificationBell;
+

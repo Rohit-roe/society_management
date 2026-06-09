@@ -1,5 +1,8 @@
 import { useState, useEffect } from 'react';
 import API from '../../api/axios';
+import { Search, MessageSquare } from 'lucide-react';
+import Pagination from '../../components/common/Pagination';
+import EmptyState from '../../components/common/EmptyState';
 
 const STATUSES = ['open', 'in_progress', 'resolved', 'closed', 'escalated'];
 const CATEGORIES = ['water', 'lift', 'electricity', 'parking', 'security', 'noise', 'plumbing', 'custom'];
@@ -14,6 +17,14 @@ const ManageSupportTicketsPage = () => {
   const [statusFilter, setStatusFilter] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [priorityFilter, setPriorityFilter] = useState('');
+
+  const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(5);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter, categoryFilter, priorityFilter, itemsPerPage]);
 
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -64,13 +75,25 @@ const ManageSupportTicketsPage = () => {
   };
 
   const filteredTickets = tickets.filter((t) => {
+    const titleText = t.title || t.subject || '';
+    const descText = t.description || '';
+    const matchesSearch =
+      titleText.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      descText.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === '' ? true : t.status === statusFilter;
     const matchesCategory = categoryFilter === '' ? true : t.category === categoryFilter;
     const matchesPriority = priorityFilter === '' ? true : t.priority === priorityFilter;
-    return matchesStatus && matchesCategory && matchesPriority;
+    return matchesSearch && matchesStatus && matchesCategory && matchesPriority;
   });
 
-  if (loading && tickets.length === 0) return <p className="page-container">Loading support tickets...</p>;
+  const totalItems = filteredTickets.length;
+  const totalPages = Math.ceil(totalItems / itemsPerPage);
+  const paginatedTickets = filteredTickets.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  if (loading && tickets.length === 0) return <div className="page-container"><div className="skeleton card-skeleton" /></div>;
 
   return (
     <div className="page-container">
@@ -81,144 +104,214 @@ const ManageSupportTicketsPage = () => {
       {success && <p className="success-msg">{success}</p>}
 
       {/* Filters Toolbar */}
-      <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' }}>
-        <div>
-          <label style={{ fontSize: '0.8rem', fontWeight: '600', color: '#1a3c5e' }}>Status</label>
+      <div className="modern-filter-bar" style={{ marginBottom: '24px' }}>
+        <div className="modern-filter-search-wrap">
+          <Search className="modern-filter-search-icon" size={16} />
+          <input
+            type="text"
+            className="modern-filter-search-input"
+            placeholder="Search tickets by subject or details..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+        <div className="modern-filter-group">
           <select
+            className="modern-filter-select"
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            style={{ width: '160px', padding: '8px', marginTop: '4px', marginBottom: '0' }}
           >
-            <option value="">-- All Statuses --</option>
+            <option value="">All Statuses</option>
             {STATUSES.map((s) => (
               <option key={s} value={s}>
                 {s.toUpperCase().replace('_', ' ')}
               </option>
             ))}
           </select>
-        </div>
-
-        <div>
-          <label style={{ fontSize: '0.8rem', fontWeight: '600', color: '#1a3c5e' }}>Category</label>
           <select
+            className="modern-filter-select"
             value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value)}
-            style={{ width: '160px', padding: '8px', marginTop: '4px', marginBottom: '0' }}
+            style={{ textTransform: 'capitalize' }}
           >
-            <option value="">-- All Categories --</option>
+            <option value="">All Categories</option>
             {CATEGORIES.map((c) => (
               <option key={c} value={c}>
-                {c.toUpperCase()}
+                {c.replace('_', ' ')}
               </option>
             ))}
           </select>
-        </div>
-
-        <div>
-          <label style={{ fontSize: '0.8rem', fontWeight: '600', color: '#1a3c5e' }}>Priority</label>
           <select
+            className="modern-filter-select"
             value={priorityFilter}
             onChange={(e) => setPriorityFilter(e.target.value)}
-            style={{ width: '160px', padding: '8px', marginTop: '4px', marginBottom: '0' }}
           >
-            <option value="">-- All Priorities --</option>
+            <option value="">All Priorities</option>
             {PRIORITIES.map((p) => (
               <option key={p} value={p}>
                 {p.toUpperCase()}
               </option>
             ))}
           </select>
+          {(searchTerm || statusFilter || categoryFilter || priorityFilter) && (
+            <button
+              type="button"
+              className="btn btn-secondary modern-filter-btn-clear"
+              onClick={() => {
+                setSearchTerm('');
+                setStatusFilter('');
+                setCategoryFilter('');
+                setPriorityFilter('');
+              }}
+            >
+              Clear
+            </button>
+          )}
         </div>
       </div>
 
       {/* Tickets List */}
       <div style={{ display: 'grid', gap: '16px' }}>
-        {filteredTickets.length === 0 ? (
-          <p className="note">No complaints matching current filters.</p>
+        {paginatedTickets.length === 0 ? (
+          <EmptyState
+            icon={MessageSquare}
+            title={searchTerm || statusFilter || categoryFilter || priorityFilter ? "No matching complaints" : "No complaints raised"}
+            description={
+              searchTerm || statusFilter || categoryFilter || priorityFilter
+                ? "Try clearing or adjusting your filters to find more complaints."
+                : "No complaints or support tickets have been submitted yet."
+            }
+            actionText={searchTerm || statusFilter || categoryFilter || priorityFilter ? "Clear Filters" : null}
+            onAction={
+              searchTerm || statusFilter || categoryFilter || priorityFilter
+                ? () => {
+                    setSearchTerm('');
+                    setStatusFilter('');
+                    setCategoryFilter('');
+                    setPriorityFilter('');
+                  }
+                : null
+            }
+          />
         ) : (
-          filteredTickets.map((t) => (
-            <article
-              key={t._id}
-              className="card"
-              style={{
-                borderLeft: `4px solid ${
-                  t.priority === 'urgent' ? '#c0392b' : t.priority === 'high' ? '#9a7d0a' : '#2e86ab'
-                }`,
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
-                <div>
-                  <h4 style={{ color: '#1a3c5e', fontSize: '1.1rem' }}>
-                    {t.title || t.subject}
-                    <span
-                      style={{
-                        marginLeft: '8px',
-                        background: '#eef6fa',
-                        color: '#2e86ab',
-                        fontSize: '0.75rem',
-                        padding: '2px 6px',
-                        borderRadius: '4px',
-                        textTransform: 'uppercase',
-                      }}
-                    >
-                      {t.category}
-                    </span>
-                  </h4>
-                  <p style={{ fontSize: '0.85rem', color: '#555', marginTop: '6px' }}>
-                    <strong>Flat:</strong> {t.flatNumber || t.residentId?.flatNumber || 'N/A'} |{' '}
-                    <strong>Resident:</strong> {t.residentId?.name} ({t.residentId?.email}) |{' '}
-                    <strong>Date:</strong> {new Date(t.createdAt).toLocaleString()}
-                  </p>
-                </div>
-
-                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+          <>
+            {paginatedTickets.map((t) => (
+              <article
+                key={t._id}
+                className="card"
+                style={{
+                  border: '1px solid var(--border)',
+                  background: 'var(--bg-card)',
+                  borderLeft: `4px solid ${
+                    t.priority === 'urgent'
+                      ? 'var(--status-danger-text)'
+                      : t.priority === 'high'
+                      ? 'var(--status-warning-text)'
+                      : 'var(--primary)'
+                  }`,
+                  padding: '20px',
+                  borderRadius: 'var(--radius)',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: '600' }}>Status</label>
-                    <select
-                      value={t.status}
-                      onChange={(e) => handleStatusChange(t._id, e.target.value)}
-                      style={{ padding: '6px', fontSize: '0.85rem', marginBottom: '0', width: '130px' }}
-                    >
-                      {STATUSES.map((status) => (
-                        <option key={status} value={status}>
-                          {status.toUpperCase().replace('_', ' ')}
-                        </option>
-                      ))}
-                    </select>
+                    <h4 style={{ color: 'var(--text-primary)', fontSize: '1.1rem', margin: 0 }}>
+                      {t.title || t.subject}
+                      <span
+                        style={{
+                          marginLeft: '8px',
+                          background: 'var(--status-neutral-bg)',
+                          color: 'var(--status-neutral-text)',
+                          border: '1px solid var(--status-neutral-border)',
+                          fontSize: '0.75rem',
+                          padding: '2px 6px',
+                          borderRadius: '4px',
+                          textTransform: 'uppercase',
+                        }}
+                      >
+                        {t.category}
+                      </span>
+                    </h4>
+                    <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '6px', margin: '6px 0 0' }}>
+                      <strong>Flat:</strong> {t.flatNumber || t.residentId?.flatNumber || 'N/A'} |{' '}
+                      <strong>Resident:</strong> {t.residentId?.name} ({t.residentId?.email}) |{' '}
+                      <strong>Date:</strong> {new Date(t.createdAt).toLocaleString()}
+                    </p>
                   </div>
 
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: '600' }}>Assign Staff</label>
-                    <select
-                      value={t.assignedTo?._id || ''}
-                      onChange={(e) => handleAssignChange(t._id, e.target.value)}
-                      style={{ padding: '6px', fontSize: '0.85rem', marginBottom: '0', width: '150px' }}
-                    >
-                      <option value="">-- Unassigned --</option>
-                      {staffList.map((staff) => (
-                        <option key={staff._id} value={staff._id}>
-                          {staff.name} ({staff.role === 'security' ? 'Guard' : 'Admin'})
-                        </option>
-                      ))}
-                    </select>
+                  <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-secondary)' }}>Status</label>
+                      <select
+                        value={t.status}
+                        onChange={(e) => handleStatusChange(t._id, e.target.value)}
+                        style={{
+                          padding: '6px 12px',
+                          border: '1px solid var(--border)',
+                          borderRadius: '6px',
+                          background: 'var(--bg-card)',
+                          color: 'var(--text-primary)',
+                          fontSize: '0.85rem',
+                          width: '130px',
+                        }}
+                      >
+                        {STATUSES.map((status) => (
+                          <option key={status} value={status}>
+                            {status.toUpperCase().replace('_', ' ')}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-secondary)' }}>Assign Staff</label>
+                      <select
+                        value={t.assignedTo?._id || ''}
+                        onChange={(e) => handleAssignChange(t._id, e.target.value)}
+                        style={{
+                          padding: '6px 12px',
+                          border: '1px solid var(--border)',
+                          borderRadius: '6px',
+                          background: 'var(--bg-card)',
+                          color: 'var(--text-primary)',
+                          fontSize: '0.85rem',
+                          width: '150px',
+                        }}
+                      >
+                        <option value="">-- Unassigned --</option>
+                        {staffList.map((staff) => (
+                          <option key={staff._id} value={staff._id}>
+                            {staff.name} ({staff.role === 'security' ? 'Guard' : 'Admin'})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              <p style={{ fontSize: '0.9rem', color: '#333', marginTop: '16px', borderTop: '1px solid #f0f4f8', paddingTop: '12px', whiteSpace: 'pre-line' }}>
-                {t.description}
-              </p>
-
-              {t.attachment && (
-                <p style={{ marginTop: '12px', fontSize: '0.85rem' }}>
-                  <strong>Attachment file:</strong>{' '}
-                  <a href={t.attachment} target="_blank" rel="noreferrer" style={{ color: '#2e86ab', fontWeight: '600' }}>
-                    View Uploaded File
-                  </a>
+                <p style={{ fontSize: '0.9rem', color: 'var(--text-primary)', marginTop: '16px', borderTop: '1px solid var(--border)', paddingTop: '12px', whiteSpace: 'pre-line' }}>
+                  {t.description}
                 </p>
-              )}
-            </article>
-          ))
+
+                {t.attachment && (
+                  <p style={{ marginTop: '12px', fontSize: '0.85rem', margin: '12px 0 0' }}>
+                    <strong>Attachment file:</strong>{' '}
+                    <a href={t.attachment} target="_blank" rel="noreferrer" style={{ color: 'var(--primary)', fontWeight: '600' }}>
+                      View Uploaded File
+                    </a>
+                  </p>
+                )}
+              </article>
+            ))}
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={totalItems}
+              itemsPerPage={itemsPerPage}
+              onPageChange={setCurrentPage}
+              onItemsPerPageChange={setItemsPerPage}
+            />
+          </>
         )}
       </div>
     </div>

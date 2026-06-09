@@ -36,7 +36,10 @@ export const DashboardKpiGrid = ({ children, className = '' }) => (
 );
 
 export const DashboardKpiCard = ({ label, value, helper, icon = 'i', tone = 'default' }) => (
-  <article className={joinClasses('dashboard-kpi-card', `tone-${tone}`)}>
+  <article
+    className={joinClasses('dashboard-kpi-card', `tone-${tone}`)}
+    aria-label={`${label}: ${value}`}
+  >
     <div className="dashboard-kpi-icon" aria-hidden="true">
       {renderIcon(icon)}
     </div>
@@ -110,4 +113,59 @@ export const DashboardStatusBadge = ({ children, tone = 'neutral', icon, classNa
     {icon && renderIcon(icon, 'dashboard-status-icon')}
     {children}
   </span>
+);
+
+/* ============================================================
+   SKELETON LOADER COMPONENTS
+   Matching the visual shape of their dashboard counterparts.
+   All use .skeleton-box shimmer animation from index.css.
+   ============================================================ */
+
+/**
+ * DashboardKpiSkeleton
+ * Renders `count` shimmer placeholders in the same grid as DashboardKpiGrid.
+ */
+export const DashboardKpiSkeleton = ({ count = 4 }) => (
+  <div className="skeleton-kpi-grid">
+    {Array.from({ length: count }).map((_, i) => (
+      <div key={i} className="skeleton-kpi-card">
+        <div className="skeleton-box skeleton-kpi-icon" />
+        <div className="skeleton-kpi-content">
+          <div className="skeleton-box skeleton-card-row" style={{ width: '55%' }} />
+          <div className="skeleton-box skeleton-card-row" style={{ width: '38%', height: 26 }} />
+          <div className="skeleton-box skeleton-card-row" style={{ width: '70%', height: 10 }} />
+        </div>
+      </div>
+    ))}
+  </div>
+);
+
+/**
+ * DashboardCardSkeleton
+ * Renders a single shimmer card with `rows` placeholder text lines.
+ */
+export const DashboardCardSkeleton = ({ rows = 3, showTitle = true }) => (
+  <div className="skeleton-section">
+    {showTitle && <div className="skeleton-box skeleton-section-header" />}
+    {Array.from({ length: rows }).map((_, i) => (
+      <div
+        key={i}
+        className="skeleton-box skeleton-card-row"
+        style={{ width: i % 3 === 0 ? '90%' : i % 3 === 1 ? '72%' : '55%' }}
+      />
+    ))}
+  </div>
+);
+
+/**
+ * DashboardTableSkeleton
+ * Renders a shimmer table header + `rows` shimmer data rows.
+ */
+export const DashboardTableSkeleton = ({ rows = 5 }) => (
+  <div className="skeleton-section">
+    <div className="skeleton-box skeleton-table-header" />
+    {Array.from({ length: rows }).map((_, i) => (
+      <div key={i} className="skeleton-box skeleton-table-row-item" />
+    ))}
+  </div>
 );

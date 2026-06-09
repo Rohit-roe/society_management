@@ -75,6 +75,11 @@ const ROLE_GROUPS = {
         { label: 'Maintenance', to: '/admin/maintenance', icon: Wrench },
         { label: 'Finances', to: '/admin/finances', icon: Coins },
         { label: 'Penalties', to: '/admin/penalties', icon: Siren },
+      ],
+    },
+    {
+      title: 'Configuration',
+      items: [
         { label: 'Parking Management', to: '/admin/parking', icon: Car },
         { label: 'Security Shift', to: '/admin/security', icon: ShieldCheck },
         { label: 'Staff Management', to: '/admin/staff', icon: Hammer },
@@ -132,6 +137,7 @@ const DashboardLayout = ({ children }) => {
   const [profileOpen, setProfileOpen] = useState(false);
   const dropdownRef = useRef(null);
 
+  // Sync theme selection to document body class and store in localStorage
   useEffect(() => {
     document.body.className = theme;
     localStorage.setItem('theme', theme);
@@ -152,7 +158,7 @@ const DashboardLayout = ({ children }) => {
   const groups = ROLE_GROUPS[user.role] || [];
   const allLinks = groups.flatMap((group) => group.items);
   const activeLink = allLinks.find((link) => location.pathname === link.to);
-  const pageTitle = activeLink ? activeLink.label : 'SocietyApp';
+  const pageTitle = activeLink ? activeLink.label : 'Residio';
 
   const handleLogout = () => {
     logout();
@@ -175,7 +181,7 @@ const DashboardLayout = ({ children }) => {
         <div className="sidebar-header-modern">
           <Link to="/" className="sidebar-brand-modern" onClick={() => setMobileShow(false)}>
             <Landmark className="nav-icon" aria-hidden="true" />
-            <span>SocietyApp</span>
+            <span>Residio</span>
           </Link>
           <button
             type="button"
@@ -233,17 +239,6 @@ const DashboardLayout = ({ children }) => {
           </div>
 
           <div className="top-nav-actions">
-            <label className="theme-select-wrap">
-              <span>Theme</span>
-              <select value={theme} onChange={(e) => setTheme(e.target.value)} aria-label="Select theme">
-                {THEMES.map((item) => (
-                  <option key={item.value} value={item.value}>
-                    {item.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-
             {user.societyId && <NotificationBell />}
 
             <div ref={dropdownRef} className="profile-menu-wrap">
@@ -266,6 +261,34 @@ const DashboardLayout = ({ children }) => {
                     <span>{user.role.replace('_', ' ')}</span>
                     {user.flatNumber && <span>Flat {user.flatNumber}</span>}
                   </div>
+                  
+                  {/* Theme Selector inside Profile Dropdown */}
+                  <div className="theme-select-wrap" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '12px' }}>
+                    <span style={{ fontSize: '0.72rem', fontWeight: '800', textTransform: 'uppercase', color: 'var(--text-secondary)' }}>Theme</span>
+                    <select
+                      value={theme}
+                      onChange={(e) => setTheme(e.target.value)}
+                      aria-label="Select theme"
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px',
+                        borderRadius: 'var(--radius)',
+                        border: '1px solid var(--border)',
+                        background: 'var(--bg-card)',
+                        color: 'var(--text-primary)',
+                        fontSize: '0.82rem',
+                        fontWeight: '700',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {THEMES.map((item) => (
+                        <option key={item.value} value={item.value}>
+                          {item.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
                   <button type="button" className="profile-logout" onClick={handleLogout}>
                     <LogOut className="nav-icon" />
                     Logout

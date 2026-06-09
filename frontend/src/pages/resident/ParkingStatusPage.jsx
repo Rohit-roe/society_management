@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import API from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
+import { Car, AlertTriangle, X } from 'lucide-react';
 
 const ParkingStatusPage = () => {
   const { user } = useAuth();
@@ -9,6 +10,29 @@ const ParkingStatusPage = () => {
   const [selectedSlot, setSelectedSlot] = useState(null);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
+
+  // Ref for focus trap
+  const textareaRef = useRef(null);
+
+  // ESC Key listener for modal
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setSelectedSlot(null);
+      }
+    };
+    if (selectedSlot) {
+      window.addEventListener('keydown', handleKeyDown);
+    }
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedSlot]);
+
+  // Focus trap
+  useEffect(() => {
+    if (selectedSlot) {
+      textareaRef.current?.focus();
+    }
+  }, [selectedSlot]);
 
   const loadSlots = async () => {
     try {
@@ -46,7 +70,9 @@ const ParkingStatusPage = () => {
   return (
     <div className="page-container">
       <div className="page-header">
-        <h2>🚗 Parking Slots Status</h2>
+        <h2 className="inline-flex items-center gap-2">
+          <Car className="w-8 h-8 text-primary" /> Parking Slots Status
+        </h2>
       </div>
 
       {message && <div className="card" style={{ color: 'var(--primary)', fontWeight: 600 }}>{message}</div>}
@@ -66,7 +92,7 @@ const ParkingStatusPage = () => {
                   style={{ marginTop: '12px', padding: '6px 12px', fontSize: '0.8rem' }}
                   onClick={() => setSelectedSlot(slot)}
                 >
-                  ⚠️ Report Issue
+                  <AlertTriangle className="w-4 h-4 mr-1" /> Report Issue
                 </button>
               </div>
             ))
@@ -112,10 +138,13 @@ const ParkingStatusPage = () => {
           <div className="modal-content">
             <div className="modal-header">
               <h3 className="modal-title">Report Parking Issue for {selectedSlot.slotNumber}</h3>
-              <button type="button" className="modal-close" onClick={() => setSelectedSlot(null)}>✕</button>
+              <button type="button" className="modal-close" onClick={() => setSelectedSlot(null)} aria-label="Close modal">
+                <X size={16} />
+              </button>
             </div>
             <form onSubmit={handleReport}>
               <textarea
+                ref={textareaRef}
                 placeholder="Describe the parking issue (e.g. unauthorized vehicle MH-12-AB-1234 parked in my slot)..."
                 value={complaintText}
                 onChange={(e) => setComplaintText(e.target.value)}
