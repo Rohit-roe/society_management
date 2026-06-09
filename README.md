@@ -1,75 +1,75 @@
-# Society Management App (MERN — Phase 1)
+# Residio — Premium Society Management Platform
 
-Portfolio-ready society management system: notices, visitor logging, and maintenance tracking with role-based access.
+Residio is a modern, portfolio-ready MERN-stack society management system designed to streamline apartment and housing community operations. It includes notices, visitor logs, facility bookings, maintenance tracking, billing, dynamic analytics, and real-time alerts.
 
-## Stack
+---
 
-- **MongoDB** + **Express** + **React (Vite)** + **Node.js**
-- JWT authentication, bcrypt password hashing
+## Technical Stack
 
-## Quick start
+- **Frontend**: React (Vite), TailwindCSS, Recharts, Lucide Icons, Socket.io-client, React Hot Toast, QRCode.react.
+- **Backend**: Node.js, Express, MongoDB, Mongoose, Socket.io, Razorpay.
+- **Authentication**: JSON Web Tokens (JWT) with secure HTTP-only configurations & bcrypt password hashing.
+
+---
+
+## Quick Start
 
 ### Prerequisites
-
 - Node.js 18+
-- MongoDB running locally (`mongodb://localhost:27017`) **or** MongoDB Atlas URI in `backend/.env`
+- MongoDB running locally (`mongodb://localhost:27017`) **or** a MongoDB Atlas URI configured in `backend/.env`.
 
-### 1. Backend
-
+### 1. Backend Setup
 ```bash
 cd backend
 npm install
-cp .env.example .env   # edit MONGO_URI and JWT_SECRET if needed
-npm run seed           # once — creates demo society and users
-npm run dev            # http://localhost:5000
+cp .env.example .env   # Configure MONGO_URI, JWT_SECRET, and optional keys (Razorpay, OpenAI)
+npm run seed           # Runs once — populates demo societies and user profiles
+npm run dev            # API runs at http://localhost:5000
 ```
 
-### 2. Frontend
-
+### 2. Frontend Setup
 ```bash
 cd frontend
 npm install
-cp .env.example .env   # optional: VITE_API_URL
-npm run dev            # http://localhost:5173
+cp .env.example .env   # Set VITE_API_URL if connecting to a remote API
+npm run dev            # Frontend runs at http://localhost:5173
 ```
 
-## Demo accounts (after seed)
+---
+
+## Demo Accounts (After Seed)
 
 Password for all: `Admin@1234`
 
-| Role | Email |
-|------|-------|
-| App Admin | admin@app.com |
-| Society Admin | societyadmin@greenvalley.com |
-| Resident | resident@greenvalley.com |
-| Security | security@greenvalley.com |
+| Role | Email | Description |
+|------|-------|-------------|
+| **App Admin** | `admin@app.com` | Super admin managing societies and user accounts. |
+| **Society Admin** | `societyadmin@greenvalley.com` | Manage greenvalley society notices, billing, facilities, staff, and parking. |
+| **Resident** | `resident@greenvalley.com` | View billing, register guests, submit tickets, request parking, and book facilities. |
+| **Security** | `security@greenvalley.com` | Verify visitor QR passes, log walk-ins, check check-in/check-out logs. |
+
+---
+
+## Implemented Features (MERN Overhaul)
+
+### Core Functions
+- **Real-Time Notice Board**: Dynamic announcements with search, urgent priority filters, and custom category badges.
+- **Maintenance & Payments**: Automatic monthly dues creation with embedded Razorpay gateway checkouts.
+- **Facility Bookings**: Grid calendar checking and booking for common facilities (clubhouse, gym).
+- **Security Check-Ins**: Interactive guest registers, walk-in notifications, and check-out logs.
+- **Vault & Polls**: Multi-user shared file storage and real-time voting on community issues.
+
+### Premium UI/UX & Accessibility Enhancements
+- **Dynamic Chart Theming**: Analytics dashboards use `MutationObserver` to sync color strokes in Recharts with the active website theme (Clean Corporate, Warm Modern, Midnight Dashboard, Graphite Pro) on-the-fly.
+- **Robust Accessibility**: ESC key handlers, auto-focus input traps, and standard Lucide close icons implemented on all modal panels.
+- **Onboarding Experience**: Dismissible greeting checks to guide new residents, saved locally.
+- **Pre-Approved Visitor Passes**: Resident invitation panels with instant SVG QR pass overlays using `qrcode.react`.
+- **Non-destructive QR Scanner**: Clean teardowns and reconstruction of the HTML5-qrcode camera feeds, avoiding full-page browser reloads.
+- **Layout Sizing Stability**: Responsive column splits for facility bookings, fluid grid cards for dashboards, and fixed-width forms to eliminate content jumping.
+
+---
 
 ## Documentation
 
-See **[PROJECT_SPEC.md](./PROJECT_SPEC.md)** for roles, API routes, schemas, and Phase 2 roadmap.
-
-See **[FUNCTIONALITIES.md](./FUNCTIONALITIES.md)** for a detailed explanation of every feature — what it does, why it exists, and how it is implemented.
-
-## Deployment notes
-
-- Set `MONGO_URI` and `JWT_SECRET` on your host (Railway/Render).
-- Set `VITE_API_URL` to your deployed API before building the frontend (`npm run build`).
-- Host frontend on Vercel/Netlify; API on Railway/Render.
-
-## Phase 1 scope
-
-- Auth + society selection on register
-- Notice board (login required)
-- Visitor log + checkout
-- Maintenance records + admin status updates
-
-## Phase 2 & 3 (implemented)
-
-- **Razorpay** — Pay Now on maintenance (add `RAZORPAY_*` to `backend/.env`)
-- **Visitor approval** — pre-approve + QR scan at gate; walk-in resident approval
-- **Facility booking** — calendar slots, admin approve/reject
-- **Real-time notifications** — Socket.io + notification bell + history page
-- **AI chatbot** — OpenAI assistant for residents (add `OPENAI_API_KEY`)
-- **Analytics** — Recharts dashboard for society admins
-
-Optional: `EMAIL_USER` / `EMAIL_PASS` for sending visitor QR emails via Gmail.
+- **[PROJECT_SPEC.md](./PROJECT_SPEC.md)**: Details permission hierarchies, API paths, schemas, and complete lists of routes.
+- **[FUNCTIONALITIES.md](./FUNCTIONALITIES.md)**: Comprehensive breakdown of every feature, detailing code implementation, UI states, and data contracts.
